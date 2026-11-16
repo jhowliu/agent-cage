@@ -332,16 +332,38 @@ function failureReason(log: string): string {
         !/^(exit code|stdout|stderr):/.test(line),
     );
   // An error message says more than the name of the failing test.
+  const index = [
+    lines.findIndex((line) => /^(error:|E\s)|error\b|assert/i.test(line)),
+    lines.findIndex((line) => /fail|not ok|panic|expected/i.test(line)),
+  ].find((found) => found !== -1);
   const reason =
-    lines.find((line) => /^(error:|E\s)|error\b|assert/i.test(line)) ??
-    lines.find((line) => /fail|not ok|panic|expected/i.test(line)) ??
-    lines.at(-1) ??
-    "no output";
+    index === undefined ? (lines.at(-1) ?? "no output") : withBlockText(lines, index);
   const singleLine = reason.replaceAll("`", "'").replace(/\s+/g, " ");
 
   return singleLine.length > reasonMaxLength
     ? `${singleLine.slice(0, reasonMaxLength - 3)}...`
     : singleLine;
+}
+
+/**
+ * A TAP field such as `error: |-` holds its text on the next lines; join the
+ * first two of them onto the field name, up to the next field.
+ */
+function withBlockText(lines: string[], index: number): string {
+  const line = lines[index] ?? "";
+  if (!/:\s*[|>][-+]?$/.test(line)) {
+    return line;
+  }
+
+  const text: string[] = [];
+  for (const next of lines.slice(index + 1)) {
+    if (/^[\w-]+:(\s|$)/.test(next) || text.length === 2) {
+      break;
+    }
+    text.push(next);
+  }
+
+  return [line.replace(/\s*[|>][-+]?$/, ""), ...text].join(" ");
 }
 
 function codeList(files: string[]): string {

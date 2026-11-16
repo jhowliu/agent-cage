@@ -117,6 +117,27 @@ test("the red check passes a test written before the code, which fails on the co
   );
 });
 
+test("the red check reads a multi-line error as its reason", async () => {
+  await withRepo(
+    { "src/math.js": mathSource, "test/math.test.js": mathTest },
+    async (cwd, shell) => {
+      const before = await snapshotWorkspace(shell);
+      await writeFiles(cwd, {
+        "test/math.test.js": `${mathTest}
+test("divide rounds", () => assert.equal(divide(7, 2), 3));
+`,
+      });
+
+      const [result] = (await red(shell, before)).tests;
+
+      assert.equal(
+        result?.status === "red" ? result.reason : "",
+        "error: Expected values to be strictly equal: 3.5 !== 3",
+      );
+    },
+  );
+});
+
 test("the red check flags a test that already passes before the code", async () => {
   await withRepo(
     { "src/math.js": mathSource, "test/math.test.js": mathTest },
