@@ -36,6 +36,33 @@ test("config schema rejects empty verify commands", () => {
   );
 });
 
+test("config schema leaves test-first runs (red-green) off unless configured", () => {
+  const config = agentCageConfigSchema.parse({ verify: ["npm test"] });
+
+  assert.deepEqual(config.guards, { max_secret_fix_attempts: 2, red_green: null });
+  assert.deepEqual(
+    agentCageConfigSchema.parse({
+      verify: ["npm test"],
+      guards: {
+        red_green: { test_files: ["test/**/*.test.js"], run: "node --test {file}" },
+      },
+    }).guards.red_green,
+    { test_files: ["test/**/*.test.js"], support_files: [], run: "node --test {file}" },
+  );
+});
+
+test("config schema requires red_green.run to name the test file", () => {
+  const result = agentCageConfigSchema.safeParse({
+    verify: ["npm test"],
+    guards: { red_green: { test_files: ["test/**"], run: "npm test" } },
+  });
+
+  assert.equal(result.success, false);
+  assert.ok(
+    result.error?.issues.some((issue) => /must contain \{file\}/.test(issue.message)),
+  );
+});
+
 test("config schema accepts explicit runtime image and Dockerfile", () => {
   const config = agentCageConfigSchema.parse({
     verify: ["npm test"],

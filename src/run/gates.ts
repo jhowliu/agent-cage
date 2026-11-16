@@ -28,6 +28,7 @@ import {
 import type { FailureCode, PhaseName, ReviewDecision, RunStatus } from "../state.js";
 import { RunFailureError } from "./errors.js";
 import { formatReviewIssueContext } from "./prompts.js";
+import { formatRedGreenSummary, type RedGreenReport } from "./red-green.js";
 
 export type VerificationResult =
   | { passed: true; summary: string; items: string[] }
@@ -102,6 +103,7 @@ export async function runReviewGate(input: {
   review: typeof runIndependentReview;
   diff: string;
   verification: Extract<VerificationResult, { passed: true }>;
+  redGreen: RedGreenReport | null;
   iteration: number;
   reviewCycle: number;
 }): Promise<ReviewNextAction> {
@@ -114,9 +116,12 @@ export async function runReviewGate(input: {
       iteration: input.iteration,
       repo: input.context.repoResolution.repo.fullName,
     };
+    const redGreenSummary =
+      input.redGreen === null ? undefined : formatRedGreenSummary(input.redGreen);
     const reviewPrompt = buildReviewPrompt({
       issueContext: reviewIssueContext,
       verificationSummary: input.verification.summary,
+      redGreenSummary,
       reviewPolicyStatus,
       resultMetadata,
       diff: input.diff,
@@ -134,6 +139,7 @@ export async function runReviewGate(input: {
       issueContext: reviewIssueContext,
       diff: input.diff,
       verificationSummary: input.verification.summary,
+      redGreenSummary,
       reviewPolicyStatus,
       resultMetadata,
       readCurrentDiff: async () => await readRunDiff(input.shell, input.context),

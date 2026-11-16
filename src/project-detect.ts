@@ -1,5 +1,6 @@
 import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import type { RedGreenConfig } from "./config.js";
 
 /**
  * Toolchains the Agent Cage base image (node:22-bookworm) lacks. Listed in the
@@ -26,6 +27,8 @@ export type ProjectDetection = {
   setup: string[];
   verify: string[];
   toolchains: ProjectToolchain[];
+  // How to run one test file, when the test runner is known.
+  redGreen: RedGreenConfig | null;
 };
 
 /** Read-only view of the repo root, so detection can be tested without a disk. */
@@ -39,6 +42,7 @@ type EcosystemDetection = {
   setup: string[];
   verify: string[];
   toolchains: ProjectToolchain[];
+  redGreen?: RedGreenConfig | null;
 };
 
 export function projectFilesAt(cwd: string): ProjectFiles {
@@ -84,6 +88,8 @@ export async function detectProject(files: ProjectFiles): Promise<ProjectDetecti
     setup: detections.flatMap((detection) => detection.setup),
     verify: detections.flatMap((detection) => detection.verify),
     toolchains: projectToolchains.filter((toolchain) => toolchains.has(toolchain)),
+    redGreen:
+      detections.find((detection) => detection.redGreen != null)?.redGreen ?? null,
   };
 }
 
@@ -98,7 +104,46 @@ async function detectNode(files: ProjectFiles): Promise<EcosystemDetection | nul
     setup: [manager.setup],
     verify: nodeVerifyCommands(manager.run, packageJson.scripts),
     toolchains: manager.toolchains,
+    redGreen: nodeRedGreen(manager.run, packageJson),
   };
+}
+
+const jsTestFiles = ["**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs,mts,cts}"];
+
+/**
+ * Runs one test file with the runner the test script uses. A test script that
+ * builds first (tests run from build output) gets no default: reverting the
+ * source would not revert the build.
+ */
+function nodeRedGreen(
+  runPrefix: string,
+  packageJson: { scripts: Record<string, string>; dependencies: string[] },
+): RedGreenConfig | null {
+  const testScript = packageJson.scripts.test ?? "";
+  const uses = (tool: string): boolean =>
+    packageJson.dependencies.includes(tool) ||
+    new RegExp(`\\b${tool}\\b`).test(testScript);
+  const exec =
+    runPrefix === "npm run" ? "npx" : runPrefix === "pnpm" ? "pnpm exec" : runPrefix;
+
+  if (uses("vitest")) {
+    return {
+      test_files: jsTestFiles,
+      support_files: [],
+      run: `${exec} vitest run {file}`,
+    };
+  }
+  if (uses("jest")) {
+    return { test_files: jsTestFiles, support_files: [], run: `${exec} jest {file}` };
+  }
+  if (/^node\s+--test\b/.test(testScript.trim())) {
+    return {
+      test_files: ["**/*.test.{js,mjs,cjs}"],
+      support_files: [],
+      run: "node --test {file}",
+    };
+  }
+  return null;
 }
 
 async function nodePackageManager(
@@ -143,14 +188,23 @@ function nodeVerifyCommands(
 function parsePackageJson(text: string): {
   scripts: Record<string, string>;
   packageManager: string | undefined;
+  dependencies: string[];
 } {
   const parsed: unknown = JSON.parse(text);
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { scripts: {}, packageManager: undefined };
+    return { scripts: {}, packageManager: undefined, dependencies: [] };
   }
   const scripts = "scripts" in parsed ? parsed.scripts : undefined;
   const packageManager = "packageManager" in parsed ? parsed.packageManager : undefined;
+  const dependencies = ["dependencies", "devDependencies"].flatMap((key) => {
+    const value: unknown =
+      key in parsed ? (parsed as Record<string, unknown>)[key] : undefined;
+    return value === null || typeof value !== "object" || Array.isArray(value)
+      ? []
+      : Object.keys(value);
+  });
   return {
+    dependencies,
     scripts:
       scripts === null || typeof scripts !== "object" || Array.isArray(scripts)
         ? {}
@@ -169,32 +223,39 @@ const pythonVenv = "$HOME/.venv";
 
 async function detectPython(files: ProjectFiles): Promise<EcosystemDetection | null> {
   if (await files.exists("uv.lock")) {
-    return {
-      ecosystem: "python",
-      setup: ["uv sync --frozen"],
-      verify: ["uv run pytest"],
-      toolchains: ["uv"],
-    };
+    return pythonDetection(["uv sync --frozen"], "uv run pytest", ["uv"]);
   }
   if (await files.exists("poetry.lock")) {
-    return {
-      ecosystem: "python",
-      setup: ["poetry install"],
-      verify: ["poetry run pytest"],
-      toolchains: ["uv", "poetry"],
-    };
+    return pythonDetection(["poetry install"], "poetry run pytest", ["uv", "poetry"]);
   }
   if (await files.exists("requirements.txt")) {
-    return {
-      ecosystem: "python",
-      setup: [
+    return pythonDetection(
+      [
         `python3 -m venv "${pythonVenv}" && "${pythonVenv}/bin/pip" install -r requirements.txt`,
       ],
-      verify: [`"${pythonVenv}/bin/python" -m pytest`],
-      toolchains: ["python"],
-    };
+      `"${pythonVenv}/bin/python" -m pytest`,
+      ["python"],
+    );
   }
   return null;
+}
+
+function pythonDetection(
+  setup: string[],
+  pytest: string,
+  toolchains: ProjectToolchain[],
+): EcosystemDetection {
+  return {
+    ecosystem: "python",
+    setup,
+    verify: [pytest],
+    toolchains,
+    redGreen: {
+      test_files: ["**/test_*.py", "**/*_test.py"],
+      support_files: ["**/conftest.py"],
+      run: `${pytest} {file}`,
+    },
+  };
 }
 
 async function detectGo(files: ProjectFiles): Promise<EcosystemDetection | null> {

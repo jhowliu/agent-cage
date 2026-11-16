@@ -43,7 +43,7 @@ Run the guided setup inside the target repository:
 agent-cage setup
 ```
 
-Agent Cage detects setup and verification commands for Node (npm, pnpm, Yarn), Python (uv, Poetry, `requirements.txt`), Go, Rust, and Java (Maven, Gradle wrapper) projects, falling back to a Makefile `test` target, plus the base branch. When the project needs a toolchain the base image lacks (Python, Go, Rust, a JDK, or corepack for pnpm/Yarn 2+), setup offers to generate `.agent-cage/Dockerfile` that adds it and sets `runtime.dockerfile`. It configures local Docker runs and can optionally generate GitHub Actions automation. Re-run the same command whenever settings need to change.
+Agent Cage detects setup and verification commands for Node (npm, pnpm, Yarn), Python (uv, Poetry, `requirements.txt`), Go, Rust, and Java (Maven, Gradle wrapper) projects, falling back to a Makefile `test` target, plus the base branch. For node:test, Vitest, Jest, and pytest it also offers [red-green runs](docs/workflow.md#red-green-test-first): the agent writes tests first, Agent Cage checks that they fail, and the tests stay locked until the code makes them pass. When the project needs a toolchain the base image lacks (Python, Go, Rust, a JDK, or corepack for pnpm/Yarn 2+), setup offers to generate `.agent-cage/Dockerfile` that adds it and sets `runtime.dockerfile`. It configures local Docker runs and can optionally generate GitHub Actions automation. Re-run the same command whenever settings need to change.
 
 For a non-interactive setup using detected defaults:
 
@@ -281,8 +281,8 @@ The main runtime flow is:
 5. Build or select the runtime image.
 6. Clone the target repo into the Docker workspace.
 7. Start configured Compose services and run setup commands.
-8. Run Codex implementation iterations.
-9. Run configured verification commands.
+8. Run Codex implementation iterations. With red-green configured, the agent first writes tests that must fail, and they stay locked while it writes the code.
+9. Run configured verification commands, then, with red-green, check that the tests written first pass.
 10. Scan the diff for secret leaks and protected files.
 11. Run independent read-only Codex review.
 12. Commit, push, and create a GitHub PR only after all gates pass.

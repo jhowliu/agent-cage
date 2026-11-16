@@ -143,6 +143,10 @@ issue:
 
 guards:
   max_secret_fix_attempts: 2
+  red_green:
+    test_files: ["test/**/*.test.js"]
+    support_files: []
+    run: node --test {file}
 
 actions:
   enabled: true
@@ -184,7 +188,49 @@ Codex review runs in Codex's read-only sandbox. Claude Code has no OS-level sand
 
 `runtime.image` accepts any valid Docker image reference and defaults to the Agent Cage GHCR base image. If `runtime.dockerfile` is set, Agent Cage builds a labeled per-run image before cloning the target repository. The first version uses `.agent-cage/` as the Docker build context, so target runtime Dockerfiles should keep package-install inputs inside that directory.
 
+`guards.red_green` makes runs [write tests first](#red-green-test-first). It is off unless configured.
+
 `actions.enabled` generates a managed issue workflow. Local execution remains Docker-based; the generated workflow sets `AGENT_CAGE_EXECUTION=direct` for the disposable Actions runner. Actions services and an optional job container are configured under `actions`, while local Compose services remain under `services`.
+
+## Red-Green (Test First)
+
+With `guards.red_green` configured, a run follows test-driven development: the agent writes tests before the code, Agent Cage checks that they fail, the agent writes the code while the tests stay locked, and Agent Cage checks that they pass. Agents often write tests that pass either way, such as an assertion that is always true or a test of a mock instead of the code. A test that failed before the code existed and passes after it shows that it tests the change.
+
+Files matching `test_files` or `support_files` (helpers, fixtures, mocks) are the tests. `run` runs one test file, named by `{file}`.
+
+1. **Red step**, in the first iteration and after each blocking review. The implementation agent gets a prompt to write only tests, for the issue or the review's feedback, covering the boundaries they imply. Agent Cage then reverts any change outside the tests and runs each test file the agent wrote or changed; each must fail on the code as it stands. Tests that already pass go back to the agent once.
+2. **Green step.** The implementation agent writes the code. Its prompt names the tests written first and says they are locked. If it changes a test anyway, Agent Cage restores it and tells the agent, once. A test changed again is kept, and the review gets its diff.
+3. **Green check**, after the verification commands pass: every test file written first must pass. One that fails goes back to the agent like a failed verification command.
+
+A failed verification command, a failed green check, or a secret-guard retry repeats only the green step. A blocking review starts a new red step, checked against the code written so far.
+
+| Result                             | PR verification line                                                                                   | Review                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Failed before the code, passes now | `` `file` was written before the code, failed without it (`reason`), and passes with it. ``            | Gets the failure output. A test that failed only on a missing import is judged by its assertions. |
+| Already passed before the code     | `` `file` was written before the code but already passed without it, so it may not test the change. `` | Blocking unless a test of existing behavior was asked for.                                        |
+| Changed after it failed            | `` `file` was changed while the code was written, after it failed. ``                                  | Gets the diff and checks that the change does not weaken the test.                                |
+| No test written first              | `no test was written before the code.`                                                                 | Decides whether the change needs a test.                                                          |
+
+None of these fail a run on their own. Each red step costs one more agent call, or two when its tests go back to the agent. The red step writes `test-prompt-<iteration>-<attempt>.md` and `red-check-<iteration>-<attempt>.json`; the green check writes `green-check-<iteration>.json`.
+
+`agent-cage setup` offers a default when it recognizes the test runner:
+
+| Test runner                             | `test_files`                                               | `run`                                            |
+| --------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------ |
+| Vitest (dependency or test script)      | `**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs,mts,cts}`         | `npx vitest run {file}` (or `pnpm exec`, `yarn`) |
+| Jest (dependency or test script)        | same                                                       | `npx jest {file}`                                |
+| `node --test` as the test script        | `**/*.test.{js,mjs,cjs}`                                   | `node --test {file}`                             |
+| pytest (uv, Poetry, `requirements.txt`) | `**/test_*.py`, `**/*_test.py` (support: `**/conftest.py`) | the pytest command, then `{file}`                |
+
+Interactive setup asks before adding it; `setup --yes` adds it only to a new config.
+
+Limits:
+
+- A test of new code fails because what it imports does not exist yet. That proves the code is new, not that the assertions are meaningful; the review reads them.
+- A test helper outside `test_files` and `support_files` is code, so the red step cannot write it. Add its path to `support_files`.
+- When tests run from build output, `run` must build first. Setup gives no default for a test script that builds first.
+- Tests inside source files, such as Rust `#[cfg(test)]` modules, cannot be written apart from the code; keep `test_files` to separate test files.
+- The checks work per file: a file with one failing new test and one empty one still counts as red.
 
 ## Doctor
 
@@ -389,6 +435,7 @@ Each run records prompt context artifacts under `.agent-cage/runs/<run-id>`:
 - `prompt-context.json`
 - `implementation-prompt-<iteration>.md`
 - `review-prompt-<cycle>.md`
+- `test-prompt-<iteration>-<attempt>.md`, `red-check-<iteration>-<attempt>.json`, and `green-check-<iteration>.json` when red-green is configured
 
 Prompt artifacts include review policy path/status only; they do not include full review policy contents.
 

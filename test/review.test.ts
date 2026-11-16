@@ -67,6 +67,33 @@ test("buildReviewPrompt includes read-only instructions and required context", (
   assert.match(prompt, /diff --git/);
 });
 
+test("buildReviewPrompt explains the red-green results only when the run wrote tests first", () => {
+  const input = {
+    issueContext: "Issue: fix divide",
+    diff: "diff --git a/src/math.js b/src/math.js",
+    verificationSummary: "npm test passed",
+    resultMetadata: { runId: "run-1" },
+  };
+  const withCheck = buildReviewPrompt({
+    ...input,
+    redGreenSummary:
+      "- `test/math.test.js`: written first, but already passed before the code was written.",
+  });
+
+  assert.match(
+    withCheck,
+    /Red-green \(test-driven development\): the agent wrote tests before the code/,
+  );
+  assert.match(
+    withCheck,
+    /does not test the change\. Treat it as blocking unless what was asked/,
+  );
+  assert.match(withCheck, /only because what it imports did not exist yet/);
+  assert.match(withCheck, /changed after it failed may have been weakened/);
+  assert.match(withCheck, /`test\/math\.test\.js`: written first, but already passed/);
+  assert.doesNotMatch(buildReviewPrompt(input), /Red-green/);
+});
+
 test("buildReviewPrompt asks a passing review for a PR description that follows the repo's rules", () => {
   const prompt = buildReviewPrompt({
     issueContext: "Issue: add review",

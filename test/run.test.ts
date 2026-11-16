@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -33,6 +34,7 @@ import {
   type RunEvent,
 } from "../src/run/events.js";
 import { openRunStore, type FailureCode } from "../src/state.js";
+import { createHostShellRunner } from "../src/sandbox-execution.js";
 
 const repo: GithubRepo = {
   owner: "jhowliu",
@@ -74,6 +76,26 @@ async function readRunEvents(cwd: string, runId: string): Promise<RunEvent[]> {
     .split(/\r?\n/)
     .filter((line) => line !== "")
     .map(parseRunEventLine);
+}
+
+/** A git repo with one commit holding `files`, for runs that need real git. */
+async function createGitRepo(files: Record<string, string>): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "agent-cage-run-repo-"));
+  const git = (...args: string[]): string =>
+    execFileSync("git", args, { cwd: dir, encoding: "utf8" });
+  git("init", "--quiet", "--initial-branch=main");
+  git("config", "user.email", "test@example.com");
+  git("config", "user.name", "Test");
+  for (const [path, content] of Object.entries({
+    "package.json": `{ "type": "module" }\n`,
+    ...files,
+  })) {
+    await mkdir(join(dir, path, ".."), { recursive: true });
+    await writeFile(join(dir, path), content, "utf8");
+  }
+  git("add", "--all");
+  git("commit", "--quiet", "-m", "base");
+  return dir;
 }
 
 function fakeSandbox(events: string[]): DockerSandbox {
@@ -1439,6 +1461,286 @@ for (const scenario of replayableFailureScenarios) {
     }
   });
 }
+
+test("runAgentCage writes tests first, locks them while the code is written, and writes new tests for a blocking review", async () => {
+  const cwd = await createProject(`
+verify:
+  - node --test
+guards:
+  red_green:
+    test_files: ["test/**/*.test.js"]
+    run: node --test {file}
+agent:
+  max_iterations: 3
+`);
+  const mathTest = `import { test } from "node:test";
+import assert from "node:assert/strict";
+import { divide } from "../src/math.js";
+
+test("divide", () => assert.equal(divide(6, 3), 2));
+`;
+  const divideByZeroTest = `${mathTest}test("divide by zero", () => assert.throws(() => divide(1, 0), RangeError));
+`;
+  const divideByZeroSource = `export function divide(a, b) {
+  if (b === 0) throw new RangeError("Cannot divide by zero");
+  return a / b;
+}
+`;
+  const repoDir = await createGitRepo({
+    "src/math.js": "export function divide(a, b) { return a / b; }\n",
+    "test/math.test.js": mathTest,
+  });
+  const write = async (files: Record<string, string>): Promise<void> => {
+    for (const [path, content] of Object.entries(files)) {
+      await writeFile(join(repoDir, path), content, "utf8");
+    }
+  };
+  // One entry per agent call, in order.
+  const agentSteps = [
+    // Red step, first try: a test of behavior that already exists.
+    () =>
+      write({
+        "test/math.test.js": `${mathTest}test("divide again", () => assert.equal(divide(1, 4), 0.25));\n`,
+      }),
+    // Red step, second try: a failing test, plus code the red step may not write.
+    () =>
+      write({ "test/math.test.js": divideByZeroTest, "src/math.js": divideByZeroSource }),
+    // Green step: the code, and a locked test weakened to fit it.
+    () => write({ "src/math.js": divideByZeroSource, "test/math.test.js": mathTest }),
+    // Red step for the blocking review.
+    () =>
+      write({
+        "test/strings.test.js": `import { test } from "node:test";
+import assert from "node:assert/strict";
+import { divide } from "../src/math.js";
+
+test("divide rejects strings", () => assert.throws(() => divide("1", 2), TypeError));
+`,
+      }),
+    // Green step: the code, and the locked test changed again.
+    () =>
+      write({
+        "src/math.js": `export function divide(a, b) {
+  if (typeof a !== "number" || typeof b !== "number") throw new TypeError("numbers only");
+  if (b === 0) throw new RangeError("Cannot divide by zero");
+  return a / b;
+}
+`,
+        "test/math.test.js": `${divideByZeroTest}// weakened\n`,
+      }),
+  ];
+  const host = createHostShellRunner(repoDir);
+  let agentCalls = 0;
+  const shell: ShellRunner = {
+    async run(command, options) {
+      if (command.includes("git clone") || command.includes("git fetch origin")) {
+        return commandResult();
+      }
+      if (command.includes("codex exec")) {
+        const step = agentSteps[agentCalls];
+        agentCalls += 1;
+        assert.ok(step, `unexpected agent call ${agentCalls}`);
+        await step();
+        return commandResult("done");
+      }
+      return await host.run(command, options);
+    },
+  };
+  const reviewSummaries: (string | undefined)[] = [];
+  let publishedVerification: string[] = [];
+
+  try {
+    const result = await runAgentCage(
+      { cwd, issueUrl: issue.url },
+      {
+        executionMode: "docker",
+        generateRunId: () => "run-red-green",
+        readEnv: async () => ({ GITHUB_TOKEN: "token-value" }),
+        findCodexAuthFile: async () => null,
+        fetchIssueContext: async () => issue,
+        resolveTargetRepo: async () => repoResolution,
+        createAuthenticatedRepo: () => ({
+          repo,
+          cloneUrl: "https://github.com/jhowliu/agent-cage.git",
+          redactedCloneUrl: "https://github.com/jhowliu/agent-cage.git",
+        }),
+        createDockerSandbox: () => fakeSandbox([]),
+        createShellRunner: () => shell,
+        runIndependentReview: async (input) => {
+          reviewSummaries.push(input.redGreenSummary);
+          if (reviewSummaries.length > 1) {
+            return passingReview();
+          }
+          return {
+            report: {
+              decision: "blocking",
+              summary: "Strings are not rejected.",
+              findings: [],
+              prDescription: null,
+            },
+            nextAction: {
+              action: "fix",
+              nextCycle: 1,
+              feedback: "divide must reject strings.",
+            },
+          };
+        },
+        publishSuccessfulRun: async (input) => {
+          publishedVerification = input.metadata.verification;
+          return {
+            branchName: input.branchName ?? "agent-cage/red-green",
+            commitMessage: "red-green",
+            prTitle: "red-green",
+            prBody: "body",
+            prUrl: "https://github.com/jhowliu/agent-cage/pull/106",
+          };
+        },
+      },
+    );
+
+    assert.equal(result.status, "succeeded");
+    assert.equal(agentCalls, agentSteps.length);
+    const runDir = join(cwd, ".agent-cage", "runs", "run-red-green");
+    const artifact = async (name: string): Promise<string> =>
+      await readFile(join(runDir, name), "utf8");
+
+    // Red step: tests first; a test that already passes goes back once, and
+    // code the red step writes is reverted.
+    assert.match(
+      await artifact("test-prompt-1-1.md"),
+      /Write the tests for the issue below, before the code/,
+    );
+    assert.match(
+      await artifact("test-prompt-1-2.md"),
+      /already pass on the code as it stands/,
+    );
+    assert.deepEqual(JSON.parse(await artifact("red-check-1-2.json")).reverted, [
+      "src/math.js",
+    ]);
+
+    // Green step: the tests are locked; a changed test is restored once.
+    assert.match(
+      await artifact("implementation-prompt-1.md"),
+      /Make the tests written for this change pass: `test\/math\.test\.js`\./,
+    );
+    assert.match(
+      await artifact("implementation-prompt-2.md"),
+      /They are locked, and Agent Cage restored them/,
+    );
+    assert.match(
+      await artifact("implementation-prompt-2.md"),
+      /pass: `test\/math\.test\.js`, `test\/strings\.test\.js`\./,
+    );
+
+    // A blocking review gets its own red step against the code written so far.
+    const secondTestPrompt = await artifact("test-prompt-2-1.md");
+    assert.match(secondTestPrompt, /Earlier iterations already wrote code/);
+    assert.match(secondTestPrompt, /divide must reject strings\./);
+    assert.deepEqual(
+      JSON.parse(await artifact("red-check-2-1.json")).tests.map(
+        (test: { file: string; status: string }) => [test.file, test.status],
+      ),
+      [["test/strings.test.js", "red"]],
+    );
+
+    const replay = await replayRunEventJournal(join(runDir, "events.ndjson"));
+    assert.deepEqual(
+      replay.stages.map((stage) => [stage.stage, stage.attempt, stage.status]),
+      [
+        ["prepare", 1, "succeeded"],
+        ["implement", 1, "succeeded"],
+        ["verify", 1, "succeeded"],
+        ["review", 1, "failed"],
+        ["implement", 2, "succeeded"],
+        ["verify", 2, "succeeded"],
+        ["review", 2, "succeeded"],
+        ["publish", 1, "succeeded"],
+      ],
+    );
+
+    // The locked test changed a second time is kept and shown to the review.
+    assert.equal(
+      await readFile(join(repoDir, "test/math.test.js"), "utf8"),
+      `${divideByZeroTest}// weakened\n`,
+    );
+    assert.match(
+      reviewSummaries[0] ?? "",
+      /`test\/math\.test\.js`: written first; failed before/,
+    );
+    assert.doesNotMatch(reviewSummaries[0] ?? "", /changed while the code was written/);
+    assert.match(
+      reviewSummaries[1] ?? "",
+      /`test\/math\.test\.js`: changed while the code was written[\s\S]*\+\/\/ weakened/,
+    );
+    assert.deepEqual(
+      publishedVerification.filter((item) => item.startsWith("Red-green:")),
+      [
+        "Red-green: `test/math.test.js` was written before the code, failed without it (`error: 'Missing expected exception (RangeError).'`), and passes with it.",
+        "Red-green: `test/strings.test.js` was written before the code, failed without it (`error: 'Missing expected exception (TypeError).'`), and passes with it.",
+        "Red-green: `test/math.test.js` was changed while the code was written, after it failed.",
+      ],
+    );
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+    await rm(repoDir, { recursive: true, force: true });
+  }
+});
+
+test("runAgentCage writes no tests first unless the repo configures red-green", async () => {
+  const cwd = await createProject(`
+verify:
+  - npm test
+`);
+  const shell = happyPathShell();
+  let reviewSummary: string | undefined = "unset";
+
+  try {
+    const result = await runAgentCage(
+      { cwd, issueUrl: issue.url },
+      {
+        generateRunId: () => "run-no-red-green",
+        readEnv: async () => ({ GITHUB_TOKEN: "token-value" }),
+        findCodexAuthFile: async () => null,
+        fetchIssueContext: async () => issue,
+        resolveTargetRepo: async () => repoResolution,
+        createAuthenticatedRepo: () => ({
+          repo,
+          cloneUrl: "https://github.com/jhowliu/agent-cage.git",
+          redactedCloneUrl: "https://github.com/jhowliu/agent-cage.git",
+        }),
+        runIndependentReview: async (input) => {
+          reviewSummary = input.redGreenSummary;
+          return passingReview();
+        },
+        publishSuccessfulRun: async (input) => ({
+          branchName: input.branchName ?? "agent-cage/none",
+          commitMessage: "none",
+          prTitle: "none",
+          prBody: "body",
+          prUrl: "https://github.com/jhowliu/agent-cage/pull/107",
+        }),
+        ...modeDeps("docker", shell, []),
+      },
+    );
+
+    assert.equal(result.status, "succeeded");
+    assert.equal(reviewSummary, undefined);
+    assert.ok(!shell.commands.some((command) => command.includes("git write-tree")));
+    assert.equal(
+      shell.commands.filter((command) => command.includes("codex exec")).length,
+      1,
+      "no separate step writes tests first",
+    );
+    const prompt = await readFile(
+      join(cwd, ".agent-cage", "runs", "run-no-red-green", "implementation-prompt-1.md"),
+      "utf8",
+    );
+    assert.match(prompt, /A bug fix gets a test that fails without the fix/);
+    assert.doesNotMatch(prompt, /are tests, and they are locked/);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
 
 test("runAgentCage implements with Claude and reviews with Codex using scoped credentials", async () => {
   const cwd = await createProject(`

@@ -504,9 +504,13 @@ export function phaseToCanonicalStage(phase: PhaseName): CanonicalStage {
     case "cloning":
     case "setup":
       return "prepare";
+    case "write_tests":
+    case "red_check":
     case "implement":
+    case "test_lock":
       return "implement";
     case "verify":
+    case "green_check":
       return "verify";
     case "review":
       return "review";

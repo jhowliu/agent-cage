@@ -46,6 +46,8 @@ export type BuildReviewPromptInput = {
   issueContext: string;
   diff: string;
   verificationSummary: string;
+  // Present when the repo configures the red-green check.
+  redGreenSummary?: string | undefined;
   reviewPolicyStatus?: string | undefined;
   resultMetadata: Record<string, unknown>;
 };
@@ -314,7 +316,7 @@ ${input.issueContext}
 
 Verification summary:
 ${input.verificationSummary}
-
+${input.redGreenSummary === undefined ? "" : formatRedGreenSection(input.redGreenSummary)}
 Review policy:
 ${input.reviewPolicyStatus ?? "Target review policy: missing. Proceed with built-in review rules."}
 
@@ -323,6 +325,18 @@ ${JSON.stringify(input.resultMetadata, null, 2)}
 
 Diff against base:
 ${input.diff}
+`;
+}
+
+function formatRedGreenSection(summary: string): string {
+  return `
+Red-green (test-driven development): the agent wrote tests before the code. Agent Cage checked that each test file failed on the code as it stood, locked the tests while the code was written, and checked that they pass now.
+- A test that already passed before the code was written does not test the change. Treat it as blocking unless what was asked is a test of behavior that already exists.
+- A test that failed only because what it imports did not exist yet proves only that the code is new. Read its assertions and judge whether they check the behavior that was asked for, including its boundaries.
+- A test changed after it failed may have been weakened to fit the code. Check that the change keeps what the test asserted.
+- When the change alters behavior and no test was written first, decide whether the change needs a test.
+
+${summary}
 `;
 }
 

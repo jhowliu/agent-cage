@@ -65,8 +65,12 @@ export const phaseNames = [
   "runtime_image",
   "cloning",
   "setup",
+  "write_tests",
+  "red_check",
   "implement",
+  "test_lock",
   "verify",
+  "green_check",
   "review",
   "pr",
 ] as const;

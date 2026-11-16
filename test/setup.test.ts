@@ -130,6 +130,52 @@ test("setup detects commands and enables both local Docker and Actions", async (
   }
 });
 
+test("setup offers test-first runs (red-green) for a detected test runner", async () => {
+  const cwd = await tempRepo();
+  try {
+    await setup(cwd, {}, acceptingPrompts());
+    const read = async (): Promise<unknown> =>
+      (
+        parse(await readFile(join(cwd, ".agent-cage.yml"), "utf8")) as {
+          guards?: { red_green?: unknown };
+        }
+      ).guards?.red_green;
+    const nodeTest = {
+      test_files: ["**/*.test.{js,mjs,cjs}"],
+      support_files: [],
+      run: "node --test {file}",
+    };
+
+    assert.deepEqual(await read(), nodeTest);
+    await setup(cwd, { yes: true, actions: false });
+    assert.deepEqual(await read(), nodeTest);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("setup turns on test-first runs only when asked, and --yes leaves an existing config alone", async () => {
+  const cwd = await tempRepo();
+  try {
+    const declining: SetupPrompts = {
+      ...acceptingPrompts(),
+      async confirm(message, defaultValue) {
+        if (message.startsWith("Write tests first (red-green)")) return false;
+        return await acceptingPrompts().confirm(message, defaultValue);
+      },
+    };
+    await setup(cwd, {}, declining);
+    await setup(cwd, { yes: true, actions: false });
+    const config = parse(await readFile(join(cwd, ".agent-cage.yml"), "utf8")) as {
+      guards?: unknown;
+    };
+
+    assert.equal(config.guards, undefined);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
 test("setup is rerunnable and preserves unknown config", async () => {
   const cwd = await tempRepo();
   try {

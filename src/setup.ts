@@ -11,7 +11,7 @@ import {
   defaultAgentModels,
   type AgentProvider,
 } from "./agent/providers.js";
-import type { AgentCageConfig } from "./config.js";
+import type { AgentCageConfig, RedGreenConfig } from "./config.js";
 import {
   loadAgentCageConfigFile,
   updateAgentCageConfigFile,
@@ -81,6 +81,7 @@ type ProjectDefaults = {
   setup: string[];
   verify: string[];
   toolchains: ProjectToolchain[];
+  redGreen: RedGreenConfig | null;
   baseBranch: string;
 };
 
@@ -156,6 +157,7 @@ export async function setupProject(
     if (verify.length === 0) {
       throw new Error("At least one verification command is required.");
     }
+    const redGreen = await chooseRedGreen(existing, detected.redGreen, prompt);
     const runtimeNotices: string[] = [];
     const runtimeDockerfile = await chooseRuntimeDockerfile(
       existing,
@@ -193,6 +195,14 @@ export async function setupProject(
       execution: "docker",
       actions,
       ...(existing === null ? { agent } : {}),
+      ...(redGreen === null
+        ? {}
+        : {
+            guards: {
+              max_secret_fix_attempts: existing?.guards.max_secret_fix_attempts ?? 2,
+              red_green: redGreen,
+            },
+          }),
       ...(runtimeDockerfile === null
         ? {}
         : {
@@ -833,9 +843,32 @@ function toActionsRuntime(
 }
 
 async function detectProjectDefaults(cwd: string): Promise<ProjectDefaults> {
-  const { setup, verify, toolchains } = await detectProject(projectFilesAt(cwd));
+  const { setup, verify, toolchains, redGreen } = await detectProject(
+    projectFilesAt(cwd),
+  );
   const baseBranch = await detectBaseBranch(cwd);
-  return { setup, verify, toolchains, baseBranch };
+  return { setup, verify, toolchains, redGreen, baseBranch };
+}
+
+/**
+ * Offers test-first runs (red-green) when the test runner is known and the
+ * config has none. Without prompts, only a new config gets it, so rerunning setup never
+ * changes how an existing repo's runs behave.
+ */
+async function chooseRedGreen(
+  existing: AgentCageConfig | null,
+  detected: RedGreenConfig | null,
+  prompts: SetupPrompts | null,
+): Promise<RedGreenConfig | null> {
+  if (detected === null || (existing?.guards.red_green ?? null) !== null) return null;
+  if (prompts === null) return existing === null ? detected : null;
+
+  return (await prompts.confirm(
+    `Write tests first (red-green): the agent writes failing tests, then the code that passes them?\n  - test files: ${detected.test_files.join(", ")}\n  - run one file: ${detected.run}`,
+    true,
+  ))
+    ? detected
+    : null;
 }
 
 async function detectBaseBranch(cwd: string): Promise<string> {
