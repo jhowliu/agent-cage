@@ -36,8 +36,10 @@ const actionsRuntimeSchema = z.object({
 });
 
 /**
- * Red-green check: every changed test file must fail without the change and
- * pass with it. `run` runs one test file, named by `{file}`.
+ * Test-driven development: the agent writes tests first, each must fail before
+ * the code is written, and the tests stay locked until they pass. Files
+ * matching `test_files` or `support_files` are the tests; `run` runs one test
+ * file, named by `{file}`.
  */
 const redGreenConfigSchema = z.object({
   test_files: z.array(z.string().min(1)).min(1),

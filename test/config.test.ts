@@ -36,7 +36,7 @@ test("config schema rejects empty verify commands", () => {
   );
 });
 
-test("config schema leaves the red-green check off unless configured", () => {
+test("config schema leaves test-first runs (red-green) off unless configured", () => {
   const config = agentCageConfigSchema.parse({ verify: ["npm test"] });
 
   assert.deepEqual(config.guards, { max_secret_fix_attempts: 2, red_green: null });

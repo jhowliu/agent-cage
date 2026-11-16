@@ -851,8 +851,8 @@ async function detectProjectDefaults(cwd: string): Promise<ProjectDefaults> {
 }
 
 /**
- * Offers the red-green check when the test runner is known and the config has
- * none. Without prompts, only a new config gets it, so rerunning setup never
+ * Offers test-first runs (red-green) when the test runner is known and the
+ * config has none. Without prompts, only a new config gets it, so rerunning setup never
  * changes how an existing repo's runs behave.
  */
 async function chooseRedGreen(
@@ -864,7 +864,7 @@ async function chooseRedGreen(
   if (prompts === null) return existing === null ? detected : null;
 
   return (await prompts.confirm(
-    `Check that changed tests fail without the change (red-green)?\n  - test files: ${detected.test_files.join(", ")}\n  - run one file: ${detected.run}`,
+    `Write tests first (red-green): the agent writes failing tests, then the code that passes them?\n  - test files: ${detected.test_files.join(", ")}\n  - run one file: ${detected.run}`,
     true,
   ))
     ? detected

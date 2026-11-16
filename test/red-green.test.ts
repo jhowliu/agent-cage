@@ -6,12 +6,17 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import type { RedGreenConfig } from "../src/config.js";
 import {
-  filesPassingWithoutChange,
-  formatRedGreenFeedback,
+  checkGreen,
+  checkRed,
+  diffSince,
+  findChangedTests,
   formatRedGreenItems,
   formatRedGreenSummary,
-  runRedGreenCheck,
-  type RedGreenResult,
+  recordRedCheck,
+  restorePaths,
+  snapshotWorkspace,
+  testsPassingBeforeChange,
+  type RedCheck,
 } from "../src/run/red-green.js";
 import { createHostShellRunner, type ShellRunner } from "../src/sandbox-execution.js";
 
@@ -28,6 +33,14 @@ import { divide } from "../src/math.js";
 
 test("divide", () => assert.equal(divide(6, 3), 2));
 `;
+const divideByZeroTest = `${mathTest}
+test("divide by zero", () => assert.throws(() => divide(1, 0), RangeError));
+`;
+const divideByZeroSource = `export function divide(a, b) {
+  if (b === 0) throw new RangeError("Cannot divide by zero");
+  return a / b;
+}
+`;
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" });
@@ -38,6 +51,10 @@ async function writeFiles(cwd: string, files: Record<string, string>): Promise<v
     await mkdir(dirname(join(cwd, path)), { recursive: true });
     await writeFile(join(cwd, path), content, "utf8");
   }
+}
+
+async function read(cwd: string, path: string): Promise<string | null> {
+  return await readFile(join(cwd, path), "utf8").catch(() => null);
 }
 
 /** A repo with one commit on main, holding `files`. */
@@ -56,281 +73,252 @@ async function createRepo(files: Record<string, string>): Promise<string> {
   return cwd;
 }
 
-/** Everything a run would publish or review, to compare before and after. */
-function workspaceState(cwd: string): string {
-  git(cwd, "add", "--intent-to-add", "--", ".");
-  return [
-    git(cwd, "diff", "--binary", "HEAD"),
-    git(cwd, "status", "--porcelain", "--untracked-files=all"),
-  ].join("\n");
-}
-
-async function check(
-  cwd: string,
-  config: RedGreenConfig = nodeTest,
-  base = "HEAD",
-  shell: ShellRunner = createHostShellRunner(cwd),
-): Promise<RedGreenResult> {
-  return await runRedGreenCheck({ shell, config, base, redactor: (value) => value });
-}
-
-function statuses(result: RedGreenResult): [string, string][] {
-  return result.status === "checked"
-    ? result.files.map((file) => [file.file, file.status])
-    : [];
-}
-
-test("a test of the fixed behavior is red without the fix, and the workspace comes back exactly", async () => {
-  const cwd = await createRepo({
-    "src/math.js": mathSource,
-    "test/math.test.js": mathTest,
-  });
+async function withRepo(
+  files: Record<string, string>,
+  body: (cwd: string, shell: ShellRunner) => Promise<void>,
+): Promise<void> {
+  const cwd = await createRepo(files);
   try {
-    await writeFiles(cwd, {
-      "src/math.js": `export function divide(a, b) {
-  if (b === 0) throw new RangeError("Cannot divide by zero");
-  return a / b;
-}
-`,
-      "test/math.test.js": `${mathTest}
-test("divide by zero", () => assert.throws(() => divide(1, 0), RangeError));
-`,
-      "ignored/build.txt": "kept",
-    });
-    const before = workspaceState(cwd);
-
-    const result = await check(cwd);
-
-    assert.deepEqual(statuses(result), [["test/math.test.js", "red"]]);
-    assert.equal(workspaceState(cwd), before);
-    assert.equal(await readFile(join(cwd, "ignored/build.txt"), "utf8"), "kept");
-    assert.match(formatRedGreenItems(result)[0] ?? "", /fails without the change/);
+    await body(cwd, createHostShellRunner(cwd));
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
+}
+
+async function red(
+  shell: ShellRunner,
+  before: string,
+  config: RedGreenConfig = nodeTest,
+): Promise<RedCheck> {
+  return await checkRed({ shell, config, before, redactor: (value) => value });
+}
+
+function statuses(check: RedCheck): [string, string][] {
+  return check.tests.map((result) => [result.file, result.status]);
+}
+
+test("the red check passes a test written before the code, which fails on the code as it stands", async () => {
+  await withRepo(
+    { "src/math.js": mathSource, "test/math.test.js": mathTest },
+    async (cwd, shell) => {
+      const before = await snapshotWorkspace(shell);
+      await writeFiles(cwd, { "test/math.test.js": divideByZeroTest });
+
+      const check = await red(shell, before);
+
+      assert.deepEqual(statuses(check), [["test/math.test.js", "red"]]);
+      const [result] = check.tests;
+      assert.match(
+        result?.status === "red" ? result.reason : "",
+        /Missing expected exception/,
+      );
+      assert.deepEqual(check.reverted, []);
+    },
+  );
 });
 
-test("a test that passes without the change does not test it", async () => {
-  const cwd = await createRepo({
-    "src/math.js": mathSource,
-    "test/math.test.js": mathTest,
-  });
-  try {
-    await writeFiles(cwd, {
-      "src/math.js": `export function divide(a, b) {
-  if (b === 0) throw new RangeError("Cannot divide by zero");
-  return a / b;
-}
-`,
-      "test/math.test.js": `${mathTest}
+test("the red check flags a test that already passes before the code", async () => {
+  await withRepo(
+    { "src/math.js": mathSource, "test/math.test.js": mathTest },
+    async (cwd, shell) => {
+      const before = await snapshotWorkspace(shell);
+      await writeFiles(cwd, {
+        "test/math.test.js": `${mathTest}
 test("divide again", () => assert.equal(divide(1, 4), 0.25));
 `,
-    });
+      });
 
-    const result = await check(cwd);
+      const check = await red(shell, before);
 
-    assert.deepEqual(statuses(result), [["test/math.test.js", "passes_without_change"]]);
-    assert.deepEqual(filesPassingWithoutChange(result), ["test/math.test.js"]);
-    assert.match(formatRedGreenFeedback(["test/math.test.js"]), /do not test it/);
-  } finally {
-    await rm(cwd, { recursive: true, force: true });
-  }
+      assert.deepEqual(statuses(check), [["test/math.test.js", "passes_before_change"]]);
+      assert.deepEqual(testsPassingBeforeChange(check), ["test/math.test.js"]);
+    },
+  );
 });
 
-test("new code is reverted by removing it, and deleted code comes back for the run only", async () => {
-  const cwd = await createRepo({
-    "src/math.js": mathSource,
-    "src/legacy.js": "export const legacy = true;\n",
-    "test/math.test.js": mathTest,
-  });
-  try {
-    await rm(join(cwd, "src/legacy.js"));
-    await writeFiles(cwd, {
-      "src/round.js": "export const round = (value) => Math.round(value);\n",
-      "test/legacy.test.js": `import { test } from "node:test";
-import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
-
-test("legacy is gone", () => assert.equal(existsSync("src/legacy.js"), false));
-`,
-      "test/round.test.js": `import { test } from "node:test";
-import assert from "node:assert/strict";
-import { round } from "../src/round.js";
-
-test("round", () => assert.equal(round(1.6), 2));
-`,
-    });
-    const before = workspaceState(cwd);
-
-    const result = await check(cwd);
-
-    assert.deepEqual(statuses(result), [
-      ["test/legacy.test.js", "red"],
-      ["test/round.test.js", "red"],
-    ]);
-    assert.equal(
-      await readFile(join(cwd, "src/legacy.js"), "utf8").catch(() => null),
-      null,
-    );
-    assert.equal(workspaceState(cwd), before);
-    assert.equal(
-      (await readFile(join(cwd, "src/round.js"), "utf8")).includes("round"),
-      true,
-    );
-  } finally {
-    await rm(cwd, { recursive: true, force: true });
-  }
-});
-
-test("support files keep their changed version, so the test fails for the right reason", async () => {
-  const cwd = await createRepo({
-    "src/math.js": mathSource,
-    "test/math.test.js": mathTest,
-  });
-  try {
-    await writeFiles(cwd, {
-      "src/math.js": `export function divide(a, b) {
-  if (b === 0) throw new RangeError("Cannot divide by zero");
-  return a / b;
-}
-`,
-      "test/cases.js": "export const zero = 0;\n",
-      "test/math.test.js": `${mathTest}import { zero } from "./cases.js";
+test("the red check reverts code the red step wrote, and keeps support files", async () => {
+  await withRepo(
+    { "src/math.js": mathSource, "test/math.test.js": mathTest },
+    async (cwd, shell) => {
+      const before = await snapshotWorkspace(shell);
+      await writeFiles(cwd, {
+        "src/math.js": divideByZeroSource,
+        "src/round.js": "export const round = Math.round;\n",
+        "test/cases.js": "export const zero = 0;\n",
+        "test/math.test.js": `${mathTest}import { zero } from "./cases.js";
 test("divide by zero", () => assert.throws(() => divide(1, zero), RangeError));
 `,
-    });
+        "ignored/build.txt": "kept",
+      });
 
-    const reverted = await check(cwd);
-    const kept = await check(cwd, { ...nodeTest, support_files: ["test/cases.js"] });
+      const check = await red(shell, before, {
+        ...nodeTest,
+        support_files: ["test/cases.js"],
+      });
 
-    const reason = (result: RedGreenResult): string =>
-      result.status === "checked" && result.files[0]?.status === "red"
-        ? result.files[0].reason
-        : "";
-    assert.match(reason(reverted), /cases\.js|Cannot find module/i);
-    assert.doesNotMatch(reason(kept), /cases\.js|Cannot find module/i);
-  } finally {
-    await rm(cwd, { recursive: true, force: true });
-  }
+      assert.deepEqual(statuses(check), [["test/math.test.js", "red"]]);
+      assert.deepEqual(check.reverted.sort(), ["src/math.js", "src/round.js"]);
+      assert.equal(await read(cwd, "src/math.js"), mathSource);
+      assert.equal(await read(cwd, "src/round.js"), null);
+      assert.equal(await read(cwd, "test/cases.js"), "export const zero = 0;\n");
+      assert.equal(await read(cwd, "ignored/build.txt"), "kept");
+    },
+  );
 });
 
-test("a test file that fails with the change is not checked", async () => {
-  const cwd = await createRepo({
-    "src/math.js": mathSource,
-    "test/math.test.js": mathTest,
-  });
-  try {
-    await writeFiles(cwd, {
-      "test/math.test.js": `${mathTest}
-test("broken", () => assert.equal(divide(1, 1), 2));
+test("a later red step is checked against the code earlier iterations wrote", async () => {
+  await withRepo(
+    { "src/math.js": mathSource, "test/math.test.js": mathTest },
+    async (cwd, shell) => {
+      // Earlier iterations: the divide-by-zero test, then its code, uncommitted.
+      await writeFiles(cwd, {
+        "test/math.test.js": divideByZeroTest,
+        "src/math.js": divideByZeroSource,
+      });
+      const before = await snapshotWorkspace(shell);
+      await writeFiles(cwd, {
+        "test/math.test.js": `${divideByZeroTest}
+test("divide rejects strings", () => assert.throws(() => divide("1", 2), TypeError));
 `,
-    });
+      });
 
-    assert.deepEqual(statuses(await check(cwd)), [
-      ["test/math.test.js", "fails_on_its_own"],
-    ]);
-  } finally {
-    await rm(cwd, { recursive: true, force: true });
-  }
+      const check = await red(shell, before);
+
+      assert.deepEqual(statuses(check), [["test/math.test.js", "red"]]);
+      assert.equal(await read(cwd, "src/math.js"), divideByZeroSource);
+    },
+  );
 });
 
-test("a change without test files is reported as such", async () => {
-  const cwd = await createRepo({
-    "src/math.js": mathSource,
-    "test/math.test.js": mathTest,
-  });
-  try {
-    await writeFiles(cwd, { "src/math.js": `${mathSource}// note\n` });
+test("the test lock finds changed, added and deleted tests, and restores them", async () => {
+  await withRepo(
+    {
+      "src/math.js": mathSource,
+      "test/math.test.js": mathTest,
+      "test/legacy.test.js": "// legacy\n",
+    },
+    async (cwd, shell) => {
+      await writeFiles(cwd, { "test/math.test.js": divideByZeroTest });
+      const lock = await snapshotWorkspace(shell);
+      await rm(join(cwd, "test/legacy.test.js"));
+      await writeFiles(cwd, {
+        "src/math.js": divideByZeroSource,
+        "test/math.test.js": mathTest,
+        "test/extra.test.js": "// extra\n",
+      });
 
-    const result = await check(cwd);
+      const changed = await findChangedTests(shell, nodeTest, lock);
 
-    assert.deepEqual(result, { status: "no_test_changes" });
-    assert.deepEqual(formatRedGreenItems(result), ["Red-green: no test file changed."]);
-  } finally {
-    await rm(cwd, { recursive: true, force: true });
-  }
+      assert.deepEqual(
+        changed.map((entry) => [entry.path, entry.status]),
+        [
+          ["test/extra.test.js", "A"],
+          ["test/legacy.test.js", "D"],
+          ["test/math.test.js", "M"],
+        ],
+      );
+      assert.match(
+        await diffSince(shell, lock, ["test/math.test.js"]),
+        /^-test\("divide by zero"/m,
+      );
+
+      await restorePaths(shell, lock, changed);
+
+      assert.equal(await read(cwd, "test/math.test.js"), divideByZeroTest);
+      assert.equal(await read(cwd, "test/legacy.test.js"), "// legacy\n");
+      assert.equal(await read(cwd, "test/extra.test.js"), null);
+      assert.equal(await read(cwd, "src/math.js"), divideByZeroSource);
+      assert.deepEqual(await findChangedTests(shell, nodeTest, lock), []);
+    },
+  );
 });
 
-test("a revision is checked against the merge base, including its earlier commits", async () => {
-  const cwd = await createRepo({
-    "src/math.js": mathSource,
-    "test/math.test.js": mathTest,
-  });
-  try {
-    git(cwd, "checkout", "--quiet", "-b", "feature");
-    await writeFiles(cwd, {
-      "src/math.js": `export function divide(a, b) {
-  if (b === 0) throw new RangeError("Cannot divide by zero");
-  return a / b;
-}
+test("the green check runs the tests written first and skips a deleted one", async () => {
+  await withRepo(
+    { "src/math.js": divideByZeroSource, "test/math.test.js": divideByZeroTest },
+    async (cwd, shell) => {
+      await writeFiles(cwd, {
+        "test/strings.test.js": `import { test } from "node:test";
+import assert from "node:assert/strict";
+import { divide } from "../src/math.js";
+
+test("divide rejects strings", () => assert.throws(() => divide("1", 2), TypeError));
 `,
-    });
-    git(cwd, "commit", "--quiet", "--all", "-m", "earlier revise");
-    await writeFiles(cwd, {
-      "test/math.test.js": `${mathTest}
-test("divide by zero", () => assert.throws(() => divide(1, 0), RangeError));
-`,
-    });
-    const before = workspaceState(cwd);
+      });
 
-    const result = await check(cwd, nodeTest, "main");
+      const results = await checkGreen({
+        shell,
+        config: nodeTest,
+        files: ["test/math.test.js", "test/strings.test.js", "test/gone.test.js"],
+        redactor: (value) => value,
+      });
 
-    assert.deepEqual(statuses(result), [["test/math.test.js", "red"]]);
-    assert.equal(workspaceState(cwd), before);
-    assert.equal(git(cwd, "rev-parse", "--abbrev-ref", "HEAD").trim(), "feature");
-  } finally {
-    await rm(cwd, { recursive: true, force: true });
-  }
+      assert.deepEqual(
+        results.map((result) => [result.file, result.passed]),
+        [
+          ["test/math.test.js", true],
+          ["test/strings.test.js", false],
+        ],
+      );
+    },
+  );
 });
 
-test("the workspace is restored when a test run throws", async () => {
-  const cwd = await createRepo({
-    "src/math.js": mathSource,
-    "test/math.test.js": mathTest,
-  });
-  try {
-    await writeFiles(cwd, {
-      "src/math.js": `export function divide(a, b) { return b === 0 ? NaN : a / b; }\n`,
-      "test/math.test.js": `${mathTest}
-test("zero", () => assert.ok(Number.isNaN(divide(1, 0))));
-`,
-    });
-    const before = workspaceState(cwd);
-    const host = createHostShellRunner(cwd);
-    let testRuns = 0;
-    const shell: ShellRunner = {
-      async run(command, options) {
-        if (command.startsWith("node --test") && (testRuns += 1) === 2) {
-          throw new Error("sandbox went away");
-        }
-        return await host.run(command, options);
-      },
-    };
-
-    await assert.rejects(check(cwd, nodeTest, "HEAD", shell), /sandbox went away/);
-    assert.equal(workspaceState(cwd), before);
-  } finally {
-    await rm(cwd, { recursive: true, force: true });
-  }
-});
-
-test("the review summary shows the output of red tests and names the others", () => {
-  const summary = formatRedGreenSummary({
-    status: "checked",
-    files: [
-      {
-        file: "test/a.test.js",
-        status: "red",
-        reason: "AssertionError",
-        log: "$ node --test 'test/a.test.js'\nexit code: 1\nAssertionError",
-      },
-      { file: "test/b.test.js", status: "passes_without_change", log: "" },
+test("the PR lines and the review summary describe each test written first", () => {
+  const report = recordRedCheck(
+    { tests: [], changedAfterRed: [] },
+    {
+      tests: [
+        {
+          file: "test/a.test.js",
+          status: "red",
+          reason: "AssertionError",
+          log: "$ node --test 'test/a.test.js'\nexit code: 1\nAssertionError",
+        },
+        { file: "test/b.test.js", status: "passes_before_change", log: "" },
+      ],
+      reverted: [],
+    },
+  );
+  const withChange = {
+    ...report,
+    changedAfterRed: [
+      { file: "test/a.test.js", diff: "-assert.equal(x, 2)\n+assert.ok(x)" },
     ],
-  });
+  };
 
+  assert.deepEqual(formatRedGreenItems(withChange), [
+    "Red-green: `test/a.test.js` was written before the code, failed without it (`AssertionError`), and passes with it.",
+    "Red-green: `test/b.test.js` was written before the code but already passed without it, so it may not test the change.",
+    "Red-green: `test/a.test.js` was changed while the code was written, after it failed.",
+  ]);
+  const summary = formatRedGreenSummary(withChange);
   assert.match(
     summary,
-    /`test\/a\.test\.js`: fails without the change[\s\S]*AssertionError/,
+    /`test\/a\.test\.js`: written first; failed before[\s\S]*AssertionError/,
   );
-  assert.match(summary, /`test\/b\.test\.js`: passes without the change\./);
+  assert.match(summary, /`test\/b\.test\.js`: written first, but already passed/);
+  assert.match(summary, /changed while the code was written[\s\S]*\+assert\.ok\(x\)/);
+  assert.deepEqual(formatRedGreenItems({ tests: [], changedAfterRed: [] }), [
+    "Red-green: no test was written before the code.",
+  ]);
+});
+
+test("a later red step replaces a file's earlier result", () => {
+  const first = recordRedCheck(
+    { tests: [], changedAfterRed: [] },
+    {
+      tests: [{ file: "test/a.test.js", status: "passes_before_change", log: "" }],
+      reverted: [],
+    },
+  );
+  const second = recordRedCheck(first, {
+    tests: [{ file: "test/a.test.js", status: "red", reason: "boom", log: "boom" }],
+    reverted: [],
+  });
+
+  assert.deepEqual(
+    second.tests.map((result) => [result.file, result.status]),
+    [["test/a.test.js", "red"]],
+  );
 });

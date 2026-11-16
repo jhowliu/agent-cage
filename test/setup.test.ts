@@ -130,7 +130,7 @@ test("setup detects commands and enables both local Docker and Actions", async (
   }
 });
 
-test("setup offers the red-green check for a detected test runner", async () => {
+test("setup offers test-first runs (red-green) for a detected test runner", async () => {
   const cwd = await tempRepo();
   try {
     await setup(cwd, {}, acceptingPrompts());
@@ -154,13 +154,13 @@ test("setup offers the red-green check for a detected test runner", async () => 
   }
 });
 
-test("setup adds the red-green check only when asked, and --yes leaves an existing config alone", async () => {
+test("setup turns on test-first runs only when asked, and --yes leaves an existing config alone", async () => {
   const cwd = await tempRepo();
   try {
     const declining: SetupPrompts = {
       ...acceptingPrompts(),
       async confirm(message, defaultValue) {
-        if (message.startsWith("Check that changed tests fail")) return false;
+        if (message.startsWith("Write tests first (red-green)")) return false;
         return await acceptingPrompts().confirm(message, defaultValue);
       },
     };

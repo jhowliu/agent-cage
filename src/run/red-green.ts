@@ -5,167 +5,268 @@ import { formatCommandLog, type ShellRunner } from "../sandbox-execution.js";
 import { shellQuote } from "../shell.js";
 
 /**
- * How one changed test file fared. A test proves the change only when it fails
- * without it and passes with it ("red"). One that passes without the change
- * does not test it; one that fails on its own with the change could not be
- * checked.
+ * Test-driven development, enforced. In the red step the agent writes tests
+ * before the code, and each test file it writes must fail on the code as it
+ * stands. The tests are then locked while the agent writes the code (the green
+ * step), and must pass once the code is done.
+ *
+ * "Tests" here are the files matching `test_files` or `support_files`; only
+ * the red step may change them.
  */
-export type RedGreenFileResult =
+
+/** How one test file written in the red step ran on the code as it stood. */
+export type RedTestResult =
   | { file: string; status: "red"; reason: string; log: string }
-  | { file: string; status: "passes_without_change"; log: string }
-  | { file: string; status: "fails_on_its_own"; log: string };
+  | { file: string; status: "passes_before_change"; log: string };
 
-export type RedGreenResult =
-  | { status: "no_test_changes" }
-  | { status: "checked"; files: RedGreenFileResult[] };
+export type RedCheck = {
+  tests: RedTestResult[];
+  /** Files other than tests that the red step changed; Agent Cage reverted them. */
+  reverted: string[];
+};
 
-type ChangedPath = { status: string; path: string };
+/** A locked test the green step changed, kept after the agent was told once. */
+export type TestChangedAfterRed = { file: string; diff: string };
+
+/** Everything the red-green steps found in a run, for the review and the PR. */
+export type RedGreenReport = {
+  /** The latest red-step result for each test file, across red steps. */
+  tests: RedTestResult[];
+  changedAfterRed: TestChangedAfterRed[];
+};
+
+export type GreenTestResult = { file: string; passed: boolean; log: string };
+
+export type ChangedPath = { status: string; path: string };
+
+type TestRunInput = {
+  shell: ShellRunner;
+  config: RedGreenConfig;
+  redactor: (value: string) => string;
+  commandOptions?: DockerCommandOptions | undefined;
+};
 
 const logTailLines = 40;
 const reasonMaxLength = 160;
 
 /**
- * Runs each changed test file with the change, then again with every other
- * change reverted to the base, and restores the workspace exactly.
- *
- * `base` is the revision the change starts from: HEAD for a new pull request,
- * or the merge base with the base branch for a revision.
+ * Records the workspace, including uncommitted and untracked files, as a git
+ * tree. Comparing against it later shows what a step changed.
  */
-export async function runRedGreenCheck(input: {
-  shell: ShellRunner;
-  config: RedGreenConfig;
-  base: string;
-  redactor: (value: string) => string;
-  commandOptions?: DockerCommandOptions | undefined;
-}): Promise<RedGreenResult> {
-  const { shell, config } = input;
-  const baseCommit = await git(
+export async function snapshotWorkspace(shell: ShellRunner): Promise<string> {
+  const tree = await git(shell, "git add --all && git write-tree");
+  await git(shell, "git reset --quiet");
+  return tree;
+}
+
+/**
+ * The red check: reverts what the red step changed outside the tests, then
+ * runs each test file it wrote or changed. Each must fail, because the code it
+ * tests is not written yet.
+ */
+export async function checkRed(
+  input: TestRunInput & { before: string },
+): Promise<RedCheck> {
+  const changed = await changedSince(input.shell, input.before);
+  const others = changed.filter((entry) => !isTest(input.config, entry.path));
+  await restorePaths(input.shell, input.before, others);
+
+  const tests: RedTestResult[] = [];
+  for (const entry of changed) {
+    if (entry.status === "D" || !matchesAny(entry.path, input.config.test_files)) {
+      continue;
+    }
+    const result = await runTestFile(input, entry.path);
+    tests.push(
+      result.exitCode === 0
+        ? { file: entry.path, status: "passes_before_change", log: result.log }
+        : { file: entry.path, status: "red", reason: result.reason, log: result.log },
+    );
+  }
+
+  return { tests, reverted: others.map((entry) => entry.path) };
+}
+
+/** The tests the green step changed since they were locked. */
+export async function findChangedTests(
+  shell: ShellRunner,
+  config: RedGreenConfig,
+  lock: string,
+): Promise<ChangedPath[]> {
+  return (await changedSince(shell, lock)).filter((entry) => isTest(config, entry.path));
+}
+
+/** The changes to `paths` since `lock`, as a diff for the review. */
+export async function diffSince(
+  shell: ShellRunner,
+  lock: string,
+  paths: string[],
+): Promise<string> {
+  return await git(
     shell,
-    `git rev-parse --verify ${shellQuote(`${input.base}^{commit}`)}`,
+    `git add --intent-to-add -- . && git diff --no-renames ${shellQuote(lock)} -- ${paths
+      .map(shellQuote)
+      .join(" ")}`,
   );
-  const changed = parseNameStatus(
+}
+
+/** Puts `paths` back as they were in `tree`: added files go, others come back. */
+export async function restorePaths(
+  shell: ShellRunner,
+  tree: string,
+  paths: ChangedPath[],
+): Promise<void> {
+  if (paths.length === 0) {
+    return;
+  }
+  const added = paths.filter((entry) => entry.status === "A").map((entry) => entry.path);
+  const existing = paths
+    .filter((entry) => entry.status !== "A")
+    .map((entry) => entry.path);
+  if (added.length > 0) {
+    await git(shell, `rm -f -- ${added.map(shellQuote).join(" ")}`);
+  }
+  if (existing.length > 0) {
     await git(
       shell,
-      `git add --intent-to-add -- . && git diff --name-status --no-renames -z ${shellQuote(baseCommit)}`,
-    ),
-  );
-  const isTest = (path: string): boolean => matchesAny(path, config.test_files);
-  const tests = changed
-    .filter((entry) => entry.status !== "D" && isTest(entry.path))
-    .map((entry) => entry.path);
-
-  if (tests.length === 0) {
-    return { status: "no_test_changes" };
-  }
-
-  const results = new Map<string, RedGreenFileResult>();
-  const passingWithChange: string[] = [];
-  for (const file of tests) {
-    const result = await runTestFile(input, file);
-    if (result.exitCode === 0) {
-      passingWithChange.push(file);
-    } else {
-      results.set(file, { file, status: "fails_on_its_own", log: result.log });
-    }
-  }
-
-  if (passingWithChange.length > 0) {
-    const reverted = changed.filter(
-      (entry) => !isTest(entry.path) && !matchesAny(entry.path, config.support_files),
+      `git checkout ${shellQuote(tree)} -- ${existing.map(shellQuote).join(" ")}`,
     );
-    await withChangesReverted(shell, baseCommit, reverted, async () => {
-      for (const file of passingWithChange) {
-        const result = await runTestFile(input, file);
-        results.set(
-          file,
-          result.exitCode === 0
-            ? { file, status: "passes_without_change", log: result.log }
-            : { file, status: "red", reason: result.reason, log: result.log },
-        );
-      }
-    });
+  }
+  await git(shell, "git reset --quiet");
+}
+
+/**
+ * The green check: runs each test file the red steps wrote. Each must pass. A
+ * file the green step deleted, and kept deleted, is the review's to judge.
+ */
+export async function checkGreen(
+  input: TestRunInput & { files: string[] },
+): Promise<GreenTestResult[]> {
+  const results: GreenTestResult[] = [];
+  for (const file of input.files) {
+    if ((await input.shell.run(`test -e ${shellQuote(file)}`)).exitCode !== 0) {
+      continue;
+    }
+    const result = await runTestFile(input, file);
+    results.push({ file, passed: result.exitCode === 0, log: result.log });
   }
 
+  return results;
+}
+
+/** Merges a red step's results into the run's report; a later result wins. */
+export function recordRedCheck(report: RedGreenReport, check: RedCheck): RedGreenReport {
+  const files = new Set(check.tests.map((test) => test.file));
   return {
-    status: "checked",
-    files: tests.flatMap((file) => {
-      const result = results.get(file);
-      return result === undefined ? [] : [result];
-    }),
+    ...report,
+    tests: [...report.tests.filter((test) => !files.has(test.file)), ...check.tests],
   };
 }
 
-/** The test files that passed without the change, so do not test it. */
-export function filesPassingWithoutChange(result: RedGreenResult): string[] {
-  return result.status === "checked"
-    ? result.files
-        .filter((file) => file.status === "passes_without_change")
-        .map((file) => file.file)
-    : [];
+/** The test files the red steps wrote, which the green check runs. */
+export function testsWrittenFirst(report: RedGreenReport): string[] {
+  return report.tests.map((test) => test.file);
 }
 
-/** Feedback for the implementation agent when tests pass without its change. */
-export function formatRedGreenFeedback(files: string[]): string {
-  return `These test files pass without your change, so they do not test it: ${files
-    .map((file) => `\`${file}\``)
-    .join(
-      ", ",
-    )}. Agent Cage ran them again with your other changes reverted. Change their assertions so they fail without your change. If the issue asks for tests of behavior that already exists, leave them as they are.`;
+export function testsPassingBeforeChange(check: RedCheck): string[] {
+  return check.tests
+    .filter((test) => test.status === "passes_before_change")
+    .map((test) => test.file);
 }
 
-/** One line per test file, for the pull request's verification list. */
-export function formatRedGreenItems(result: RedGreenResult): string[] {
-  if (result.status === "no_test_changes") {
-    return ["Red-green: no test file changed."];
+/** Feedback for a red step whose tests already pass. */
+export function formatRedFeedback(files: string[]): string {
+  return `These tests already pass on the code as it stands, so they do not test what is asked: ${codeList(
+    files,
+  )}. Change their assertions so they fail until the code is written. If what is asked is a test of behavior that already exists, leave them as they are.`;
+}
+
+/** Feedback for a green step that changed locked tests, which were restored. */
+export function formatLockFeedback(paths: ChangedPath[]): string {
+  return `You changed tests that were written before the code: ${codeList(
+    paths.map((entry) => entry.path),
+  )}. They are locked, and Agent Cage restored them. Change the code so they pass, not the tests. A locked test you change again is kept, and the review checks that the change does not weaken it.`;
+}
+
+/** Feedback for a green step whose tests written first still fail. */
+export function formatGreenFeedback(results: GreenTestResult[]): string {
+  return `These tests were written before the code and still fail. Change the code so they pass:\n${results
+    .filter((result) => !result.passed)
+    .map((result) => `- \`${result.file}\`:\n${indent(result.log)}`)
+    .join("\n")}`;
+}
+
+/** The log of a red check. */
+export function formatRedCheckLog(check: RedCheck): string {
+  const lines =
+    check.tests.length === 0
+      ? ["No test file was written."]
+      : check.tests.map((test) =>
+          test.status === "red"
+            ? `- \`${test.file}\`: fails (${test.reason})\n${indent(test.log)}`
+            : `- \`${test.file}\`: already passes\n${indent(test.log)}`,
+        );
+  if (check.reverted.length > 0) {
+    lines.push(
+      `Reverted changes to files other than tests: ${codeList(check.reverted)}.`,
+    );
   }
 
-  return result.files.map((file) => {
-    switch (file.status) {
-      case "red":
-        return `Red-green: \`${file.file}\` fails without the change (\`${file.reason}\`) and passes with it.`;
-      case "passes_without_change":
-        return `Red-green: \`${file.file}\` also passes without the change, so it may not test it.`;
-      case "fails_on_its_own":
-        return `Red-green: \`${file.file}\` fails when run on its own with the change, so it was not checked.`;
-      default: {
-        const exhaustive: never = file;
-        return exhaustive;
-      }
-    }
-  });
+  return lines.join("\n");
 }
 
-/** The red-green results with their output, for the review prompt. */
-export function formatRedGreenSummary(result: RedGreenResult): string {
-  if (result.status === "no_test_changes") {
-    return "No test file changed.";
-  }
-
-  return result.files
-    .map((file) => {
-      switch (file.status) {
-        case "red":
-          return `- \`${file.file}\`: fails without the change, passes with it. Output without the change:\n${indent(file.log)}`;
-        case "passes_without_change":
-          return `- \`${file.file}\`: passes without the change.`;
-        case "fails_on_its_own":
-          return `- \`${file.file}\`: fails when run on its own with the change, so it was not checked. Output:\n${indent(file.log)}`;
-        default: {
-          const exhaustive: never = file;
-          return exhaustive;
-        }
-      }
-    })
+/** The log of a green check. */
+export function formatGreenCheckLog(results: GreenTestResult[]): string {
+  return results
+    .map(
+      (result) =>
+        `- \`${result.file}\`: ${result.passed ? "passes" : "fails"}\n${indent(result.log)}`,
+    )
     .join("\n");
 }
 
+/** One line per test file, for the pull request's verification list. */
+export function formatRedGreenItems(report: RedGreenReport): string[] {
+  const items =
+    report.tests.length === 0
+      ? ["Red-green: no test was written before the code."]
+      : report.tests.map((test) =>
+          test.status === "red"
+            ? `Red-green: \`${test.file}\` was written before the code, failed without it (\`${test.reason}\`), and passes with it.`
+            : `Red-green: \`${test.file}\` was written before the code but already passed without it, so it may not test the change.`,
+        );
+
+  return [
+    ...items,
+    ...report.changedAfterRed.map(
+      (change) =>
+        `Red-green: \`${change.file}\` was changed while the code was written, after it failed.`,
+    ),
+  ];
+}
+
+/** The red-green results with their output, for the review prompt. */
+export function formatRedGreenSummary(report: RedGreenReport): string {
+  const tests =
+    report.tests.length === 0
+      ? ["No test was written before the code."]
+      : report.tests.map((test) =>
+          test.status === "red"
+            ? `- \`${test.file}\`: written first; failed before the code was written, passes now. Output before the code:\n${indent(test.log)}`
+            : `- \`${test.file}\`: written first, but already passed before the code was written.`,
+        );
+
+  return [
+    ...tests,
+    ...report.changedAfterRed.map(
+      (change) =>
+        `- \`${change.file}\`: changed while the code was written, after it failed. Changes since it failed:\n${indent(change.diff)}`,
+    ),
+  ].join("\n");
+}
+
 async function runTestFile(
-  input: {
-    shell: ShellRunner;
-    config: RedGreenConfig;
-    redactor: (value: string) => string;
-    commandOptions?: DockerCommandOptions | undefined;
-  },
+  input: TestRunInput,
   file: string,
 ): Promise<{ exitCode: number; log: string; reason: string }> {
   const command = input.config.run.replaceAll("{file}", shellQuote(file));
@@ -179,50 +280,17 @@ async function runTestFile(
   };
 }
 
-/**
- * Snapshots the workspace as a tree, reverts `paths` to `base`, runs `body`,
- * then restores the snapshot: files the tests created are removed and files
- * they changed are rewritten. Ignored files (dependencies, build output) stay.
- */
-async function withChangesReverted(
-  shell: ShellRunner,
-  base: string,
-  paths: ChangedPath[],
-  body: () => Promise<void>,
-): Promise<void> {
-  const snapshot = await git(shell, "git add --all && git write-tree");
-  await git(shell, "git reset --quiet");
-
-  try {
-    const added = paths
-      .filter((entry) => entry.status === "A")
-      .map((entry) => entry.path);
-    const existing = paths
-      .filter((entry) => entry.status !== "A")
-      .map((entry) => entry.path);
-    if (added.length > 0) {
-      await git(shell, `rm -f -- ${added.map(shellQuote).join(" ")}`);
-    }
-    if (existing.length > 0) {
-      await git(
-        shell,
-        `git checkout ${shellQuote(base)} -- ${existing.map(shellQuote).join(" ")}`,
-      );
-    }
-    await body();
-  } finally {
+async function changedSince(shell: ShellRunner, tree: string): Promise<ChangedPath[]> {
+  return parseNameStatus(
     await git(
       shell,
-      `git clean -fd --quiet && git read-tree -u --reset ${shellQuote(snapshot)} && git reset --quiet`,
-    );
-    const restored = await git(shell, "git add --all && git write-tree");
-    await git(shell, "git reset --quiet");
-    if (restored !== snapshot) {
-      throw new Error(
-        `Red-green check could not restore the workspace: expected tree ${snapshot}, found ${restored}.`,
-      );
-    }
-  }
+      `git add --intent-to-add -- . && git diff --name-status --no-renames -z ${shellQuote(tree)}`,
+    ),
+  );
+}
+
+function isTest(config: RedGreenConfig, path: string): boolean {
+  return matchesAny(path, [...config.test_files, ...config.support_files]);
 }
 
 async function git(shell: ShellRunner, command: string): Promise<string> {
@@ -274,6 +342,10 @@ function failureReason(log: string): string {
   return singleLine.length > reasonMaxLength
     ? `${singleLine.slice(0, reasonMaxLength - 3)}...`
     : singleLine;
+}
+
+function codeList(files: string[]): string {
+  return files.map((file) => `\`${file}\``).join(", ");
 }
 
 function tail(text: string, lines: number): string {

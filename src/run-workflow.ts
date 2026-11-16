@@ -5,7 +5,7 @@ import {
   hasComposeServices,
   type ComposeProject,
 } from "./compose.js";
-import type { AgentCageConfig, ExecutionMode } from "./config.js";
+import type { AgentCageConfig, ExecutionMode, RedGreenConfig } from "./config.js";
 import type { CommandCredentialIntent, RunCredentials } from "./credentials.js";
 import {
   buildRuntimeImage,
@@ -28,17 +28,30 @@ import type { RunEventSink } from "./run/events.js";
 import {
   readRunDiff,
   runPublishGate,
-  runRedGreenGate,
   runReviewGate,
   runSecretGuardGate,
   type VerificationResult,
 } from "./run/gates.js";
 import { RunJournal } from "./run/journal.js";
-import { buildImplementationPrompt } from "./run/prompts.js";
+import { buildImplementationPrompt, buildTestFirstPrompt } from "./run/prompts.js";
 import {
-  filesPassingWithoutChange,
-  formatRedGreenFeedback,
+  checkGreen,
+  checkRed,
+  diffSince,
+  findChangedTests,
+  formatGreenCheckLog,
+  formatGreenFeedback,
+  formatLockFeedback,
+  formatRedCheckLog,
+  formatRedFeedback,
   formatRedGreenItems,
+  recordRedCheck,
+  restorePaths,
+  snapshotWorkspace,
+  testsPassingBeforeChange,
+  testsWrittenFirst,
+  type RedCheck,
+  type RedGreenReport,
 } from "./run/red-green.js";
 import {
   createDockerShellRunner,
@@ -509,8 +522,18 @@ async function runImplementationLoop(input: {
   const feedback: string[] = [];
   let reviewCycle = 0;
   let guardAttempt = 0;
-  let redGreenFeedbackGiven = false;
   let lastFailure: FailureCode = "verify_failed";
+  const redGreenConfig = input.context.config.guards.red_green;
+  const tdd: TddState | null =
+    redGreenConfig === null
+      ? null
+      : {
+          config: redGreenConfig,
+          report: { tests: [], changedAfterRed: [] },
+          lock: null,
+          lockFeedbackGiven: false,
+          writeTestsNext: true,
+        };
 
   for (
     let iteration = 1;
@@ -523,11 +546,16 @@ async function runImplementationLoop(input: {
       iteration,
       input.context.config.agent.max_iterations,
     );
+    if (tdd !== null && tdd.writeTestsNext) {
+      await runRedStep({ ...input, tdd, iteration, feedback });
+      tdd.writeTestsNext = false;
+    }
     await input.journal.runPhase("implement", async () => {
       const prompt = buildImplementationPrompt({
         context: input.context,
         iteration,
         feedback,
+        testsWrittenFirst: tdd === null ? undefined : testsWrittenFirst(tdd.report),
       });
       await input.journal.writeArtifact(
         `implementation-prompt-${iteration}.md`,
@@ -549,6 +577,9 @@ async function runImplementationLoop(input: {
         runtimeCommandCredentials("implement", input.context),
       );
     });
+    if (tdd !== null) {
+      await runTestLock({ ...input, tdd, feedback });
+    }
     await input.journal.finishStage();
 
     await input.journal.setRunStatus("verifying");
@@ -564,6 +595,18 @@ async function runImplementationLoop(input: {
     if (!verification.passed) {
       lastFailure = "verify_failed";
       feedback.push(verification.feedback);
+      if (iteration === input.context.config.agent.max_iterations) {
+        throw maxIterationsError(lastFailure);
+      }
+      await input.journal.failStage("verify_failed");
+      continue;
+    }
+
+    const greenFeedback =
+      tdd === null ? null : await runGreenCheck({ ...input, tdd, iteration });
+    if (greenFeedback !== null) {
+      lastFailure = "verify_failed";
+      feedback.push(greenFeedback);
       if (iteration === input.context.config.agent.max_iterations) {
         throw maxIterationsError(lastFailure);
       }
@@ -605,35 +648,12 @@ async function runImplementationLoop(input: {
     // Preserve the reviewed change while it is still uncommitted. Only expose it
     // after the secret gate has accepted it, including during a live review.
     await input.journal.writeArtifact(`changes-${iteration}.patch`, input.redactor(diff));
-
-    const redGreen = await runRedGreenGate({
-      context: input.context,
-      journal: input.journal,
-      shell: input.shell,
-      redactor: input.redactor,
-      iteration,
-      commandOptions: runtimeCommandCredentials("verify", input.context),
-    });
-    const untestedFiles = redGreen === null ? [] : filesPassingWithoutChange(redGreen);
-    // Tests that pass without the change go back to the agent once. If they
-    // still pass, the review decides: tests of existing behavior are fine.
-    if (
-      untestedFiles.length > 0 &&
-      !redGreenFeedbackGiven &&
-      iteration < input.context.config.agent.max_iterations
-    ) {
-      redGreenFeedbackGiven = true;
-      lastFailure = "verify_failed";
-      feedback.push(formatRedGreenFeedback(untestedFiles));
-      await input.journal.failStage("verify_failed");
-      continue;
-    }
     await input.journal.finishStage();
     const checked = {
       ...verification,
       items: [
         ...verification.items,
-        ...(redGreen === null ? [] : formatRedGreenItems(redGreen)),
+        ...(tdd === null ? [] : formatRedGreenItems(tdd.report)),
       ],
     };
 
@@ -646,13 +666,17 @@ async function runImplementationLoop(input: {
       review: input.review,
       diff,
       verification: checked,
-      redGreen,
+      redGreen: tdd?.report ?? null,
       iteration,
       reviewCycle,
     });
 
     if (reviewAction.action === "fix") {
       reviewCycle = reviewAction.nextCycle;
+      // What the review asks for gets its own failing tests before the code.
+      if (tdd !== null) {
+        tdd.writeTestsNext = true;
+      }
       lastFailure = "review_blocking";
       feedback.push(
         `Independent review found blocking issues:\n${reviewAction.feedback}`,
@@ -692,6 +716,180 @@ async function runImplementationLoop(input: {
   }
 
   throw maxIterationsError(lastFailure);
+}
+
+/**
+ * Test-driven development state for one run, when the repo configures
+ * `guards.red_green`. The red step runs in the first iteration and after each
+ * blocking review; `lock` is the workspace the green step must not change the
+ * tests of.
+ */
+type TddState = {
+  config: RedGreenConfig;
+  report: RedGreenReport;
+  lock: string | null;
+  lockFeedbackGiven: boolean;
+  writeTestsNext: boolean;
+};
+
+type TddStepInput = {
+  context: RuntimeContext;
+  journal: RunJournal;
+  shell: ShellRunner;
+  redactor: (input: string) => string;
+  tdd: TddState;
+};
+
+/**
+ * The red step: the agent writes tests before the code, and each test file it
+ * writes must fail on the code as it stands. Tests that already pass go back
+ * to the agent once; if they still pass, the review decides, since a test of
+ * behavior that already exists can be what was asked for.
+ */
+async function runRedStep(
+  input: TddStepInput & { iteration: number; feedback: string[] },
+): Promise<void> {
+  const { tdd } = input;
+  const before = await snapshotWorkspace(input.shell);
+  const redFeedback: string[] = [];
+  let check: RedCheck = { tests: [], reverted: [] };
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    await input.journal.runPhase("write_tests", async () => {
+      const prompt = buildTestFirstPrompt({
+        context: input.context,
+        config: tdd.config,
+        iteration: input.iteration,
+        feedback: [...input.feedback, ...redFeedback],
+      });
+      await input.journal.writeArtifact(
+        `test-prompt-${input.iteration}-${attempt}.md`,
+        input.redactor(prompt),
+      );
+
+      return await requiredAgentShell(
+        input.shell,
+        {
+          role: "implement",
+          agent: input.context.agents.implement,
+          command: agentShellCommand(input.context.agents.implement, {
+            access: "workspace-write",
+            prompt,
+            executionMode: input.context.executionMode,
+          }),
+        },
+        input.redactor,
+        runtimeCommandCredentials("implement", input.context),
+      );
+    });
+    check = await input.journal.runPhase("red_check", async () => {
+      const value = await checkRed({
+        shell: input.shell,
+        config: tdd.config,
+        before,
+        redactor: input.redactor,
+        commandOptions: runtimeCommandCredentials("verify", input.context),
+      });
+      return { log: formatRedCheckLog(value), value };
+    });
+    await input.journal.writeJsonArtifact(
+      `red-check-${input.iteration}-${attempt}.json`,
+      check,
+    );
+
+    const passing = testsPassingBeforeChange(check);
+    if (passing.length === 0 || attempt === 2) {
+      break;
+    }
+    redFeedback.push(formatRedFeedback(passing));
+  }
+
+  tdd.report = recordRedCheck(tdd.report, check);
+  tdd.lock = await snapshotWorkspace(input.shell);
+}
+
+/**
+ * Keeps the tests locked while the code is written. A changed test is
+ * restored once, with feedback; changed again, it is kept and shown to the
+ * review with its diff.
+ */
+async function runTestLock(input: TddStepInput & { feedback: string[] }): Promise<void> {
+  const { tdd } = input;
+  const lock = tdd.lock;
+  if (lock === null) {
+    return;
+  }
+
+  await input.journal.runPhase("test_lock", async () => {
+    const changed = await findChangedTests(input.shell, tdd.config, lock);
+    const files = changed.map((entry) => `\`${entry.path}\``).join(", ");
+    if (changed.length === 0) {
+      return "Locked tests are unchanged.";
+    }
+
+    if (!tdd.lockFeedbackGiven) {
+      await restorePaths(input.shell, lock, changed);
+      tdd.lockFeedbackGiven = true;
+      input.feedback.push(formatLockFeedback(changed));
+      return `Restored locked tests: ${files}.`;
+    }
+
+    // One git command at a time: concurrent ones contend for the index lock.
+    const kept: { file: string; diff: string }[] = [];
+    for (const entry of changed) {
+      kept.push({
+        file: entry.path,
+        diff: input.redactor(await diffSince(input.shell, lock, [entry.path])),
+      });
+    }
+    const keptFiles = new Set(kept.map((change) => change.file));
+    tdd.report = {
+      ...tdd.report,
+      changedAfterRed: [
+        ...tdd.report.changedAfterRed.filter((change) => !keptFiles.has(change.file)),
+        ...kept,
+      ],
+    };
+    return `Kept changes to locked tests for the review: ${files}.`;
+  });
+}
+
+/**
+ * The green check: every test file written first must pass now. Returns
+ * feedback for the agent when one fails, or null.
+ */
+async function runGreenCheck(
+  input: TddStepInput & { iteration: number },
+): Promise<string | null> {
+  const files = testsWrittenFirst(input.tdd.report);
+  if (files.length === 0) {
+    return null;
+  }
+
+  const phase = await input.journal.startPhase("green_check");
+  let results: Awaited<ReturnType<typeof checkGreen>>;
+  try {
+    results = await checkGreen({
+      shell: input.shell,
+      config: input.tdd.config,
+      files,
+      redactor: input.redactor,
+      commandOptions: runtimeCommandCredentials("verify", input.context),
+    });
+  } catch (error) {
+    await phase.fail(formatError(error));
+    throw error;
+  }
+  await input.journal.writeJsonArtifact(`green-check-${input.iteration}.json`, results);
+
+  const log = formatGreenCheckLog(results);
+  if (results.every((result) => result.passed)) {
+    await phase.pass(log);
+    return null;
+  }
+
+  await phase.fail(log);
+  return formatGreenFeedback(results);
 }
 
 function maxIterationsError(failureCode: FailureCode): RunFailureError {
