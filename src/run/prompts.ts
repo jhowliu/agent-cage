@@ -24,6 +24,7 @@ Rules:
 - Work only in this repository. The checked-out branch holds the pull request's earlier commits; keep that work and change what the feedback asks for.
 - Do not commit, push, create pull requests, or write secrets.
 - Run only commands needed to address the feedback; Agent Cage will run verification separately.
+${testRules(input.context)}
 - ${agentInstructionFilesRule(input.context.agents.implement.provider)}
 - Where the feedback conflicts with the issue, follow the feedback: it is the newer decision.
 - If a piece of feedback is unclear, stop and explain the blocker.
@@ -50,6 +51,7 @@ Rules:
 - Work only in this repository.
 - Do not commit, push, create pull requests, or write secrets.
 - Run only commands needed to implement the issue; Agent Cage will run verification separately.
+${testRules(input.context)}
 - ${agentInstructionFilesRule(input.context.agents.implement.provider)}
 - If the issue lacks enough detail to implement safely, stop and explain the blocker.
 
@@ -63,6 +65,19 @@ ${formatIssueContext(input.context.issue)}
 Feedback to address:
 ${feedback}
 `;
+}
+
+function testRules(context: RuntimeContext): string {
+  const rules = [
+    "- Add or update tests for the behavior you change. A bug fix gets a test that fails without the fix.",
+  ];
+  if (context.config.guards.red_green !== null) {
+    rules.push(
+      "- Agent Cage runs each test file you change again with your other changes reverted. A test that still passes there does not test your change.",
+    );
+  }
+
+  return rules.join("\n");
 }
 
 function agentInstructionFilesRule(provider: AgentProvider): string {

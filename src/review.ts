@@ -46,6 +46,8 @@ export type BuildReviewPromptInput = {
   issueContext: string;
   diff: string;
   verificationSummary: string;
+  // Present when the repo configures the red-green check.
+  redGreenSummary?: string | undefined;
   reviewPolicyStatus?: string | undefined;
   resultMetadata: Record<string, unknown>;
 };
@@ -314,7 +316,7 @@ ${input.issueContext}
 
 Verification summary:
 ${input.verificationSummary}
-
+${input.redGreenSummary === undefined ? "" : formatRedGreenSection(input.redGreenSummary)}
 Review policy:
 ${input.reviewPolicyStatus ?? "Target review policy: missing. Proceed with built-in review rules."}
 
@@ -323,6 +325,17 @@ ${JSON.stringify(input.resultMetadata, null, 2)}
 
 Diff against base:
 ${input.diff}
+`;
+}
+
+function formatRedGreenSection(summary: string): string {
+  return `
+Red-green check: Agent Cage ran each changed test file with the change, then again with every other change reverted. A test proves the change only when it fails without it.
+- A test that passes without the change does not test it. Treat it as blocking unless the issue asks for tests of behavior that already exists.
+- A test that fails without the change only because what it imports does not exist yet proves only that the code is new. Read its assertions and judge whether they check the behavior the issue asks for.
+- When the change alters behavior and no test file changed, decide whether the change needs a test.
+
+${summary}
 `;
 }
 

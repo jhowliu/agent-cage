@@ -43,7 +43,7 @@ Run the guided setup inside the target repository:
 agent-cage setup
 ```
 
-Agent Cage detects setup and verification commands for Node (npm, pnpm, Yarn), Python (uv, Poetry, `requirements.txt`), Go, Rust, and Java (Maven, Gradle wrapper) projects, falling back to a Makefile `test` target, plus the base branch. When the project needs a toolchain the base image lacks (Python, Go, Rust, a JDK, or corepack for pnpm/Yarn 2+), setup offers to generate `.agent-cage/Dockerfile` that adds it and sets `runtime.dockerfile`. It configures local Docker runs and can optionally generate GitHub Actions automation. Re-run the same command whenever settings need to change.
+Agent Cage detects setup and verification commands for Node (npm, pnpm, Yarn), Python (uv, Poetry, `requirements.txt`), Go, Rust, and Java (Maven, Gradle wrapper) projects, falling back to a Makefile `test` target, plus the base branch. For node:test, Vitest, Jest, and pytest it also offers the [red-green check](docs/workflow.md#red-green-check), which reruns each changed test file without the rest of the change to confirm the test actually exercises it. When the project needs a toolchain the base image lacks (Python, Go, Rust, a JDK, or corepack for pnpm/Yarn 2+), setup offers to generate `.agent-cage/Dockerfile` that adds it and sets `runtime.dockerfile`. It configures local Docker runs and can optionally generate GitHub Actions automation. Re-run the same command whenever settings need to change.
 
 For a non-interactive setup using detected defaults:
 
@@ -284,8 +284,9 @@ The main runtime flow is:
 8. Run Codex implementation iterations.
 9. Run configured verification commands.
 10. Scan the diff for secret leaks and protected files.
-11. Run independent read-only Codex review.
-12. Commit, push, and create a GitHub PR only after all gates pass.
+11. When configured, check that each changed test file fails without the change (red-green).
+12. Run independent read-only Codex review.
+13. Commit, push, and create a GitHub PR only after all gates pass.
 
 Module responsibilities:
 

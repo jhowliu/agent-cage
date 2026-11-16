@@ -507,6 +507,7 @@ export function phaseToCanonicalStage(phase: PhaseName): CanonicalStage {
     case "implement":
       return "implement";
     case "verify":
+    case "red_green":
       return "verify";
     case "review":
       return "review";

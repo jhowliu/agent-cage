@@ -67,6 +67,7 @@ export const phaseNames = [
   "setup",
   "implement",
   "verify",
+  "red_green",
   "review",
   "pr",
 ] as const;

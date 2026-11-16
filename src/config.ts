@@ -35,6 +35,23 @@ const actionsRuntimeSchema = z.object({
   options: z.string().min(1).optional(),
 });
 
+/**
+ * Red-green check: every changed test file must fail without the change and
+ * pass with it. `run` runs one test file, named by `{file}`.
+ */
+const redGreenConfigSchema = z.object({
+  test_files: z.array(z.string().min(1)).min(1),
+  support_files: z.array(z.string().min(1)).default([]),
+  run: z
+    .string()
+    .min(1)
+    .refine((command) => command.includes("{file}"), {
+      message: "red_green.run must contain {file}, which names the test file to run.",
+    }),
+});
+
+export type RedGreenConfig = z.infer<typeof redGreenConfigSchema>;
+
 const defaultActionsLabels = {
   run: "agent-cage:run",
   in_progress: "agent-cage:in-progress",
@@ -108,8 +125,9 @@ export const agentCageConfigSchema = z
     guards: z
       .object({
         max_secret_fix_attempts: z.number().int().nonnegative().default(2),
+        red_green: redGreenConfigSchema.nullable().default(null),
       })
-      .default(() => ({ max_secret_fix_attempts: 2 })),
+      .default(() => ({ max_secret_fix_attempts: 2, red_green: null })),
     execution: z.enum(["docker", "direct"]).optional(),
     actions: z
       .object({

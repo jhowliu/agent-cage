@@ -28,12 +28,18 @@ import type { RunEventSink } from "./run/events.js";
 import {
   readRunDiff,
   runPublishGate,
+  runRedGreenGate,
   runReviewGate,
   runSecretGuardGate,
   type VerificationResult,
 } from "./run/gates.js";
 import { RunJournal } from "./run/journal.js";
 import { buildImplementationPrompt } from "./run/prompts.js";
+import {
+  filesPassingWithoutChange,
+  formatRedGreenFeedback,
+  formatRedGreenItems,
+} from "./run/red-green.js";
 import {
   createDockerShellRunner,
   createHostShellRunner,
@@ -503,6 +509,7 @@ async function runImplementationLoop(input: {
   const feedback: string[] = [];
   let reviewCycle = 0;
   let guardAttempt = 0;
+  let redGreenFeedbackGiven = false;
   let lastFailure: FailureCode = "verify_failed";
 
   for (
@@ -598,7 +605,37 @@ async function runImplementationLoop(input: {
     // Preserve the reviewed change while it is still uncommitted. Only expose it
     // after the secret gate has accepted it, including during a live review.
     await input.journal.writeArtifact(`changes-${iteration}.patch`, input.redactor(diff));
+
+    const redGreen = await runRedGreenGate({
+      context: input.context,
+      journal: input.journal,
+      shell: input.shell,
+      redactor: input.redactor,
+      iteration,
+      commandOptions: runtimeCommandCredentials("verify", input.context),
+    });
+    const untestedFiles = redGreen === null ? [] : filesPassingWithoutChange(redGreen);
+    // Tests that pass without the change go back to the agent once. If they
+    // still pass, the review decides: tests of existing behavior are fine.
+    if (
+      untestedFiles.length > 0 &&
+      !redGreenFeedbackGiven &&
+      iteration < input.context.config.agent.max_iterations
+    ) {
+      redGreenFeedbackGiven = true;
+      lastFailure = "verify_failed";
+      feedback.push(formatRedGreenFeedback(untestedFiles));
+      await input.journal.failStage("verify_failed");
+      continue;
+    }
     await input.journal.finishStage();
+    const checked = {
+      ...verification,
+      items: [
+        ...verification.items,
+        ...(redGreen === null ? [] : formatRedGreenItems(redGreen)),
+      ],
+    };
 
     await input.journal.startStage("review");
     const reviewAction = await runReviewGate({
@@ -608,7 +645,8 @@ async function runImplementationLoop(input: {
       redactor: input.redactor,
       review: input.review,
       diff,
-      verification,
+      verification: checked,
+      redGreen,
       iteration,
       reviewCycle,
     });
@@ -640,7 +678,7 @@ async function runImplementationLoop(input: {
       redactor: input.redactor,
       publish: input.publish,
       revise: input.revise,
-      verification,
+      verification: checked,
       description: reviewAction.prDescription,
     });
     await input.journal.recordSuccess(publishResult);

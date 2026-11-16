@@ -143,6 +143,10 @@ issue:
 
 guards:
   max_secret_fix_attempts: 2
+  red_green:
+    test_files: ["test/**/*.test.js"]
+    support_files: []
+    run: node --test {file}
 
 actions:
   enabled: true
@@ -184,7 +188,46 @@ Codex review runs in Codex's read-only sandbox. Claude Code has no OS-level sand
 
 `runtime.image` accepts any valid Docker image reference and defaults to the Agent Cage GHCR base image. If `runtime.dockerfile` is set, Agent Cage builds a labeled per-run image before cloning the target repository. The first version uses `.agent-cage/` as the Docker build context, so target runtime Dockerfiles should keep package-install inputs inside that directory.
 
+`guards.red_green` turns on the [red-green check](#red-green-check). It is off unless configured.
+
 `actions.enabled` generates a managed issue workflow. Local execution remains Docker-based; the generated workflow sets `AGENT_CAGE_EXECUTION=direct` for the disposable Actions runner. Actions services and an optional job container are configured under `actions`, while local Compose services remain under `services`.
+
+## Red-Green Check
+
+A test proves a change only when it fails without the change and passes with it. Agents often write tests that pass either way: an assertion that is always true, a test of the mock instead of the code, a test of behavior the change did not touch. The red-green check catches those.
+
+After verification and the secret guard pass, Agent Cage takes each test file the change adds or modifies (the paths matching `test_files`) and:
+
+1. Runs it on its own with `run`, where `{file}` names the file.
+2. Reverts every other changed file to the base (new files are removed, changed and deleted files take the base version) and runs it again. Files matching `support_files` (helpers, fixtures, mocks) keep their changed version.
+3. Restores the workspace exactly, including files the tests created or changed, and fails the run if it cannot.
+
+| Result                         | Meaning                                                  | What happens                                                                                                                        |
+| ------------------------------ | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Fails without the change (red) | The test exercises the change.                           | Listed in the PR with the first failure line.                                                                                       |
+| Passes without the change      | The test does not exercise the change.                   | Sent back to the implementation agent once. If it still passes, the review decides; tests of behavior that already exists are fine. |
+| Fails on its own               | `run` cannot run that file alone, or the test is broken. | Not checked; listed in the PR and the review prompt.                                                                                |
+| No test file changed           | Nothing to check.                                        | The review decides whether the change needs a test.                                                                                 |
+
+The check never fails a run because of what it finds; only a workspace it cannot restore fails the run. A revision is checked against the merge base with the base branch, so the whole pull request counts as the change. Results go to the review prompt, the PR's verification list, and the `red-green-<iteration>.json` artifact.
+
+`agent-cage setup` offers a default when it recognizes the test runner:
+
+| Test runner                             | `test_files`                                               | `run`                                            |
+| --------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------ |
+| Vitest (dependency or test script)      | `**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs,mts,cts}`         | `npx vitest run {file}` (or `pnpm exec`, `yarn`) |
+| Jest (dependency or test script)        | same                                                       | `npx jest {file}`                                |
+| `node --test` as the test script        | `**/*.test.{js,mjs,cjs}`                                   | `node --test {file}`                             |
+| pytest (uv, Poetry, `requirements.txt`) | `**/test_*.py`, `**/*_test.py` (support: `**/conftest.py`) | the pytest command, then `{file}`                |
+
+Interactive setup asks before adding it; `setup --yes` adds it only to a new config.
+
+Limits:
+
+- A test of new code fails without the change because what it imports does not exist yet. That proves the code is new, not that the assertions are meaningful; the review reads them.
+- Reverting reverts source files, not build output. When tests run from a build directory, `run` must rebuild it from scratch, or a removed source file's stale output still passes. Setup gives no default for a test script that builds first.
+- Tests inside source files, such as Rust `#[cfg(test)]` modules, are reverted with the code and cannot be checked; keep `test_files` to separate test files.
+- The check works per file: a file with one meaningful new test and one empty one still counts as red.
 
 ## Doctor
 
@@ -387,6 +430,7 @@ Each run records prompt context artifacts under `.agent-cage/runs/<run-id>`:
 - `prompt-context.json`
 - `implementation-prompt-<iteration>.md`
 - `review-prompt-<cycle>.md`
+- `red-green-<iteration>.json` when the red-green check ran
 
 Prompt artifacts include review policy path/status only; they do not include full review policy contents.
 

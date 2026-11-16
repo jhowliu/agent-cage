@@ -18,16 +18,24 @@ import {
   type ReviewNextAction,
   type ReviewReport,
 } from "../review.js";
+import type { DockerCommandOptions } from "../docker.js";
 import {
   createGhCommandRunner,
   createGitCommandRunner,
   createReviewAgentRunner,
+  formatCommandLog,
   readCurrentDiff,
   type ShellRunner,
 } from "../sandbox-execution.js";
+import { shellQuote } from "../shell.js";
 import type { FailureCode, PhaseName, ReviewDecision, RunStatus } from "../state.js";
 import { RunFailureError } from "./errors.js";
 import { formatReviewIssueContext } from "./prompts.js";
+import {
+  formatRedGreenSummary,
+  runRedGreenCheck,
+  type RedGreenResult,
+} from "./red-green.js";
 
 export type VerificationResult =
   | { passed: true; summary: string; items: string[] }
@@ -94,6 +102,54 @@ export function runSecretGuardGate(input: {
   }
 }
 
+/**
+ * Runs the red-green check when the repo configures one; null otherwise. The
+ * check reports rather than fails: the run loop decides what to do with tests
+ * that pass without the change.
+ */
+export async function runRedGreenGate(input: {
+  context: RuntimeContext;
+  journal: RunGateJournal;
+  shell: ShellRunner;
+  redactor: (input: string) => string;
+  iteration: number;
+  commandOptions?: DockerCommandOptions | undefined;
+}): Promise<RedGreenResult | null> {
+  const config = input.context.config.guards.red_green;
+  if (config === null) {
+    return null;
+  }
+
+  const result = await input.journal.runPhase("red_green", async () => {
+    const base =
+      input.context.revision === null
+        ? "HEAD"
+        : await mergeBaseWith(input.shell, `origin/${input.context.baseBranch}`);
+    const value = await runRedGreenCheck({
+      shell: input.shell,
+      config,
+      base,
+      redactor: input.redactor,
+      commandOptions: input.commandOptions,
+    });
+
+    return { log: formatRedGreenSummary(value), value };
+  });
+  await input.journal.writeJsonArtifact(`red-green-${input.iteration}.json`, result);
+
+  return result;
+}
+
+async function mergeBaseWith(shell: ShellRunner, ref: string): Promise<string> {
+  const command = `git merge-base ${shellQuote(ref)} HEAD`;
+  const result = await shell.run(command);
+  if (result.exitCode !== 0) {
+    throw new Error(formatCommandLog(command, result));
+  }
+
+  return result.stdout.trim();
+}
+
 export async function runReviewGate(input: {
   context: RuntimeContext;
   journal: RunGateJournal;
@@ -102,6 +158,7 @@ export async function runReviewGate(input: {
   review: typeof runIndependentReview;
   diff: string;
   verification: Extract<VerificationResult, { passed: true }>;
+  redGreen: RedGreenResult | null;
   iteration: number;
   reviewCycle: number;
 }): Promise<ReviewNextAction> {
@@ -114,9 +171,12 @@ export async function runReviewGate(input: {
       iteration: input.iteration,
       repo: input.context.repoResolution.repo.fullName,
     };
+    const redGreenSummary =
+      input.redGreen === null ? undefined : formatRedGreenSummary(input.redGreen);
     const reviewPrompt = buildReviewPrompt({
       issueContext: reviewIssueContext,
       verificationSummary: input.verification.summary,
+      redGreenSummary,
       reviewPolicyStatus,
       resultMetadata,
       diff: input.diff,
@@ -134,6 +194,7 @@ export async function runReviewGate(input: {
       issueContext: reviewIssueContext,
       diff: input.diff,
       verificationSummary: input.verification.summary,
+      redGreenSummary,
       reviewPolicyStatus,
       resultMetadata,
       readCurrentDiff: async () => await readRunDiff(input.shell, input.context),

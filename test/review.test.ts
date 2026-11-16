@@ -67,6 +67,28 @@ test("buildReviewPrompt includes read-only instructions and required context", (
   assert.match(prompt, /diff --git/);
 });
 
+test("buildReviewPrompt explains the red-green results only when the check ran", () => {
+  const input = {
+    issueContext: "Issue: fix divide",
+    diff: "diff --git a/src/math.js b/src/math.js",
+    verificationSummary: "npm test passed",
+    resultMetadata: { runId: "run-1" },
+  };
+  const withCheck = buildReviewPrompt({
+    ...input,
+    redGreenSummary: "- `test/math.test.js`: passes without the change.",
+  });
+
+  assert.match(withCheck, /Red-green check: Agent Cage ran each changed test file/);
+  assert.match(
+    withCheck,
+    /does not test it\. Treat it as blocking unless the issue asks/,
+  );
+  assert.match(withCheck, /only because what it imports does not exist yet/);
+  assert.match(withCheck, /`test\/math\.test\.js`: passes without the change\./);
+  assert.doesNotMatch(buildReviewPrompt(input), /Red-green check/);
+});
+
 test("buildReviewPrompt asks a passing review for a PR description that follows the repo's rules", () => {
   const prompt = buildReviewPrompt({
     issueContext: "Issue: add review",

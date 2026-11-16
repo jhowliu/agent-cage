@@ -18,14 +18,35 @@ function files(entries: Record<string, string>): ProjectFiles {
   };
 }
 
-function packageJson(scripts: Record<string, string>, packageManager?: string): string {
+function packageJson(
+  scripts: Record<string, string>,
+  packageManager?: string,
+  devDependencies?: Record<string, string>,
+): string {
   return JSON.stringify({
     scripts,
     ...(packageManager === undefined ? {} : { packageManager }),
+    ...(devDependencies === undefined ? {} : { devDependencies }),
   });
 }
 
-const none: ProjectDetection = { ecosystems: [], setup: [], verify: [], toolchains: [] };
+const none: ProjectDetection = {
+  ecosystems: [],
+  setup: [],
+  verify: [],
+  toolchains: [],
+  redGreen: null,
+};
+
+const jsTestFiles = ["**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs,mts,cts}"];
+
+function pytestRedGreen(pytest: string): ProjectDetection["redGreen"] {
+  return {
+    test_files: ["**/test_*.py", "**/*_test.py"],
+    support_files: ["**/conftest.py"],
+    run: `${pytest} {file}`,
+  };
+}
 
 const cases: {
   name: string;
@@ -43,6 +64,11 @@ const cases: {
       setup: ["npm ci"],
       verify: ["npm test"],
       toolchains: [],
+      redGreen: {
+        test_files: ["**/*.test.{js,mjs,cjs}"],
+        support_files: [],
+        run: "node --test {file}",
+      },
     },
   },
   {
@@ -53,6 +79,7 @@ const cases: {
       setup: ["npm install --no-package-lock"],
       verify: ["npm run typecheck"],
       toolchains: [],
+      redGreen: null,
     },
   },
   {
@@ -63,6 +90,11 @@ const cases: {
       setup: ["pnpm install --frozen-lockfile"],
       verify: ["pnpm test"],
       toolchains: ["corepack"],
+      redGreen: {
+        test_files: jsTestFiles,
+        support_files: [],
+        run: "pnpm exec vitest run {file}",
+      },
     },
   },
   {
@@ -73,6 +105,7 @@ const cases: {
       setup: ["yarn install --frozen-lockfile"],
       verify: ["yarn build"],
       toolchains: [],
+      redGreen: null,
     },
   },
   {
@@ -86,6 +119,7 @@ const cases: {
       setup: ["yarn install --immutable"],
       verify: ["yarn test"],
       toolchains: ["corepack"],
+      redGreen: { test_files: jsTestFiles, support_files: [], run: "yarn jest {file}" },
     },
   },
   {
@@ -96,6 +130,7 @@ const cases: {
       setup: ["uv sync --frozen"],
       verify: ["uv run pytest"],
       toolchains: ["uv"],
+      redGreen: pytestRedGreen("uv run pytest"),
     },
   },
   {
@@ -106,6 +141,7 @@ const cases: {
       setup: ["poetry install"],
       verify: ["poetry run pytest"],
       toolchains: ["uv", "poetry"],
+      redGreen: pytestRedGreen("poetry run pytest"),
     },
   },
   {
@@ -118,6 +154,7 @@ const cases: {
       ],
       verify: ['"$HOME/.venv/bin/python" -m pytest'],
       toolchains: ["python"],
+      redGreen: pytestRedGreen('"$HOME/.venv/bin/python" -m pytest'),
     },
   },
   {
@@ -128,6 +165,7 @@ const cases: {
       setup: ["go mod download"],
       verify: ["go test ./..."],
       toolchains: ["go"],
+      redGreen: null,
     },
   },
   {
@@ -138,6 +176,7 @@ const cases: {
       setup: ["cargo fetch"],
       verify: ["cargo test"],
       toolchains: ["rust"],
+      redGreen: null,
     },
   },
   {
@@ -148,6 +187,7 @@ const cases: {
       setup: [],
       verify: ["mvn -B test"],
       toolchains: ["jdk", "maven"],
+      redGreen: null,
     },
   },
   {
@@ -158,6 +198,7 @@ const cases: {
       setup: [],
       verify: ["./mvnw -B test"],
       toolchains: ["jdk"],
+      redGreen: null,
     },
   },
   {
@@ -168,6 +209,7 @@ const cases: {
       setup: [],
       verify: ["./gradlew test"],
       toolchains: ["jdk"],
+      redGreen: null,
     },
   },
   {
@@ -178,7 +220,13 @@ const cases: {
   {
     name: "Makefile test target when nothing else verifies",
     files: { Makefile: "build:\n\tcc main.c\n\ntest:\n\t./run-tests\n" },
-    expected: { ecosystems: ["make"], setup: [], verify: ["make test"], toolchains: [] },
+    expected: {
+      ecosystems: ["make"],
+      setup: [],
+      verify: ["make test"],
+      toolchains: [],
+      redGreen: null,
+    },
   },
   {
     name: "Makefile is ignored when an ecosystem already verifies",
@@ -188,6 +236,7 @@ const cases: {
       setup: ["go mod download"],
       verify: ["go test ./..."],
       toolchains: ["go"],
+      redGreen: null,
     },
   },
   {
@@ -202,6 +251,41 @@ const cases: {
       setup: ["npm ci", "go mod download"],
       verify: ["go test ./..."],
       toolchains: ["go"],
+      redGreen: null,
+    },
+  },
+  {
+    name: "vitest from devDependencies runs one file with npx",
+    files: {
+      "package.json": packageJson({ test: "npm run lint && npm run unit" }, undefined, {
+        vitest: "^3.0.0",
+      }),
+      "package-lock.json": "{}",
+    },
+    expected: {
+      ecosystems: ["node"],
+      setup: ["npm ci"],
+      verify: ["npm test"],
+      toolchains: [],
+      redGreen: {
+        test_files: jsTestFiles,
+        support_files: [],
+        run: "npx vitest run {file}",
+      },
+    },
+  },
+  {
+    name: "a test script that builds first has no red-green default",
+    files: {
+      "package.json": packageJson({ test: "npm run build && node --test dist/test" }),
+      "package-lock.json": "{}",
+    },
+    expected: {
+      ecosystems: ["node"],
+      setup: ["npm ci"],
+      verify: ["npm test"],
+      toolchains: [],
+      redGreen: null,
     },
   },
   { name: "nothing recognizable", files: { "README.md": "" }, expected: none },

@@ -1440,6 +1440,179 @@ for (const scenario of replayableFailureScenarios) {
   });
 }
 
+test("runAgentCage sends tests that pass without the change back once, then lets the review decide", async () => {
+  const cwd = await createProject(`
+verify:
+  - npm test
+guards:
+  red_green:
+    test_files: ["test/**/*.test.js"]
+    run: node --test {file}
+agent:
+  max_iterations: 3
+`);
+  const sandboxEvents: string[] = [];
+  const reviewSummaries: (string | undefined)[] = [];
+  let publishedVerification: string[] = [];
+  const shell = shellRunner(
+    new Map([
+      ["git fetch origin", commandResult()],
+      ["codex exec", commandResult("implemented")],
+      ["npm test", commandResult("tests passed")],
+      ["git rev-parse --verify", commandResult("abc123\n")],
+      ["git diff --name-status", commandResult("M\0src/app.js\0A\0test/app.test.js\0")],
+      // The test passes with the change and again without it.
+      ["node --test", commandResult("ok 1 - app")],
+      ["git add --all && git write-tree", commandResult("tree123\n")],
+      ["git clean -fd", commandResult()],
+      ["git reset --quiet", commandResult()],
+      ["git checkout", commandResult()],
+      [
+        "git add --intent-to-add",
+        commandResult(`diff --git a/src/app.js b/src/app.js
+@@ -1 +1,2 @@
+ export const ok = true;
++export const changed = true;
+`),
+      ],
+    ]),
+  );
+
+  try {
+    const result = await runAgentCage(
+      { cwd, issueUrl: issue.url },
+      {
+        executionMode: "docker",
+        generateRunId: () => "run-red-green",
+        readEnv: async () => ({ GITHUB_TOKEN: "token-value" }),
+        findCodexAuthFile: async () => null,
+        fetchIssueContext: async () => issue,
+        resolveTargetRepo: async () => repoResolution,
+        createAuthenticatedRepo: () => ({
+          repo,
+          cloneUrl: "https://github.com/jhowliu/agent-cage.git",
+          redactedCloneUrl: "https://github.com/jhowliu/agent-cage.git",
+        }),
+        createDockerSandbox: () => fakeSandbox(sandboxEvents),
+        createShellRunner: () => shell,
+        runIndependentReview: async (input) => {
+          reviewSummaries.push(input.redGreenSummary);
+          return passingReview();
+        },
+        publishSuccessfulRun: async (input) => {
+          publishedVerification = input.metadata.verification;
+          return {
+            branchName: input.branchName ?? "agent-cage/red-green",
+            commitMessage: "red-green",
+            prTitle: "red-green",
+            prBody: "body",
+            prUrl: "https://github.com/jhowliu/agent-cage/pull/106",
+          };
+        },
+      },
+    );
+
+    assert.equal(result.status, "succeeded");
+    const runDir = join(cwd, ".agent-cage", "runs", "run-red-green");
+    const firstPrompt = await readFile(
+      join(runDir, "implementation-prompt-1.md"),
+      "utf8",
+    );
+    const secondPrompt = await readFile(
+      join(runDir, "implementation-prompt-2.md"),
+      "utf8",
+    );
+    assert.match(firstPrompt, /A bug fix gets a test that fails without the fix/);
+    assert.match(
+      firstPrompt,
+      /runs each test file you change again with your other changes reverted/,
+    );
+    assert.match(secondPrompt, /`test\/app\.test\.js`\. Agent Cage ran them again/);
+
+    const replay = await replayRunEventJournal(join(runDir, "events.ndjson"));
+    assert.deepEqual(
+      replay.stages.map((stage) => [stage.stage, stage.attempt, stage.status]),
+      [
+        ["prepare", 1, "succeeded"],
+        ["implement", 1, "succeeded"],
+        ["verify", 1, "failed"],
+        ["implement", 2, "succeeded"],
+        ["verify", 2, "succeeded"],
+        ["review", 1, "succeeded"],
+        ["publish", 1, "succeeded"],
+      ],
+    );
+    assert.deepEqual(reviewSummaries, [
+      "- `test/app.test.js`: passes without the change.",
+    ]);
+    assert.ok(
+      publishedVerification.includes(
+        "Red-green: `test/app.test.js` also passes without the change, so it may not test it.",
+      ),
+    );
+    assert.equal(
+      shell.commands.filter((command) => command.startsWith("git clean -fd")).length,
+      2,
+      "each red-green check restores the workspace",
+    );
+    const artifact = JSON.parse(await readFile(join(runDir, "red-green-2.json"), "utf8"));
+    assert.equal(artifact.status, "checked");
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("runAgentCage runs no red-green check unless the repo configures one", async () => {
+  const cwd = await createProject(`
+verify:
+  - npm test
+`);
+  const shell = happyPathShell();
+  let reviewSummary: string | undefined = "unset";
+
+  try {
+    const result = await runAgentCage(
+      { cwd, issueUrl: issue.url },
+      {
+        generateRunId: () => "run-no-red-green",
+        readEnv: async () => ({ GITHUB_TOKEN: "token-value" }),
+        findCodexAuthFile: async () => null,
+        fetchIssueContext: async () => issue,
+        resolveTargetRepo: async () => repoResolution,
+        createAuthenticatedRepo: () => ({
+          repo,
+          cloneUrl: "https://github.com/jhowliu/agent-cage.git",
+          redactedCloneUrl: "https://github.com/jhowliu/agent-cage.git",
+        }),
+        runIndependentReview: async (input) => {
+          reviewSummary = input.redGreenSummary;
+          return passingReview();
+        },
+        publishSuccessfulRun: async (input) => ({
+          branchName: input.branchName ?? "agent-cage/none",
+          commitMessage: "none",
+          prTitle: "none",
+          prBody: "body",
+          prUrl: "https://github.com/jhowliu/agent-cage/pull/107",
+        }),
+        ...modeDeps("docker", shell, []),
+      },
+    );
+
+    assert.equal(result.status, "succeeded");
+    assert.equal(reviewSummary, undefined);
+    assert.ok(!shell.commands.some((command) => command.includes("git write-tree")));
+    const prompt = await readFile(
+      join(cwd, ".agent-cage", "runs", "run-no-red-green", "implementation-prompt-1.md"),
+      "utf8",
+    );
+    assert.match(prompt, /A bug fix gets a test that fails without the fix/);
+    assert.doesNotMatch(prompt, /with your other changes reverted/);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
 test("runAgentCage implements with Claude and reviews with Codex using scoped credentials", async () => {
   const cwd = await createProject(`
 verify:
