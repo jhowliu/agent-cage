@@ -8,7 +8,6 @@ Full setup, token, configuration, security, and QA details live in [docs/workflo
 
 ![A GitHub issue becomes a tested PR: herdr-issues hands it to Agent Cage, which writes tests first, then the code, then opens the PR](docs/live-demo.gif)
 
-https://github.com/user-attachments/assets/66e43421-9aa6-4024-8f82-6f0e9d385d6f
 
 ## Install
 
