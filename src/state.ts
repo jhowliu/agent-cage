@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, isAbsolute, join, relative } from "node:path";
 import type {
   DatabaseSync,
   SQLInputValue,
@@ -438,11 +438,25 @@ export class RunStore {
     return this.getReviewCycle(toNumber(result.lastInsertRowid));
   }
 
-  async writeArtifact(runId: string, name: string, content: string): Promise<string> {
+  /**
+   * Writes an artifact into the run directory. `name` may hold subdirectories,
+   * such as a collected report's repository path, but must stay inside the
+   * run directory.
+   */
+  async writeArtifact(
+    runId: string,
+    name: string,
+    content: string | Uint8Array,
+  ): Promise<string> {
     const path = this.artifactPath(runId, name);
+    const runDirectory = this.runDirectory(runId);
+    const fromRun = relative(runDirectory, path);
+    if (fromRun === "" || fromRun.startsWith("..") || isAbsolute(fromRun)) {
+      throw new Error(`Artifact name escapes the run directory: ${name}`);
+    }
 
-    await mkdir(this.runDirectory(runId), { recursive: true });
-    await writeFile(path, content, "utf8");
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, content);
 
     return path;
   }

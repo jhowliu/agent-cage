@@ -13,6 +13,7 @@ export const AGENT_CAGE_CONFIG_FILE = ".agent-cage.yml";
 export const managedConfigKeys = [
   "setup",
   "verify",
+  "reports",
   "services",
   "runtime",
   "agent",

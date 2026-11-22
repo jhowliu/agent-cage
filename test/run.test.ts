@@ -2107,3 +2107,125 @@ verify:
     await rm(cwd, { recursive: true, force: true });
   }
 });
+
+test("runAgentCage collects each verify's report files and keeps them out of the change", async () => {
+  const cwd = await createProject(`
+verify:
+  - |-
+    mkdir -p reports shots && printf PNG > shots/home.png
+    if grep -q fixed src/app.js; then
+      printf '<testsuite failures="0"/>' > reports/junit.xml
+    else
+      printf '<testsuite failures="1">token-value</testsuite>' > reports/junit.xml
+      exit 1
+    fi
+reports:
+  junit: ["reports/*.xml"]
+  evidence: ["shots/*.png"]
+agent:
+  max_iterations: 2
+`);
+  const repoDir = await createGitRepo({ "src/app.js": "export const state = 'new';\n" });
+  const agentSteps = [
+    // A broken change, plus a screenshot planted before verify runs.
+    async () => {
+      await writeFile(join(repoDir, "src/app.js"), "export const state = 'broken';\n");
+      await mkdir(join(repoDir, "shots"), { recursive: true });
+      await writeFile(join(repoDir, "shots/planted.png"), "fake");
+    },
+    async () => {
+      await writeFile(join(repoDir, "src/app.js"), "export const state = 'fixed';\n");
+    },
+  ];
+  const host = createHostShellRunner(repoDir);
+  let agentCalls = 0;
+  const shell: ShellRunner = {
+    async run(command, options) {
+      if (command.includes("git clone") || command.includes("git fetch origin")) {
+        return commandResult();
+      }
+      if (command.includes("codex exec")) {
+        const step = agentSteps[agentCalls];
+        agentCalls += 1;
+        assert.ok(step, `unexpected agent call ${agentCalls}`);
+        await step();
+        return commandResult("done");
+      }
+      return await host.run(command, options);
+    },
+  };
+  let reviewedDiff = "";
+
+  try {
+    const result = await runAgentCage(
+      { cwd, issueUrl: issue.url },
+      {
+        executionMode: "docker",
+        generateRunId: () => "run-reports",
+        readEnv: async () => ({ GITHUB_TOKEN: "token-value" }),
+        findCodexAuthFile: async () => null,
+        fetchIssueContext: async () => issue,
+        resolveTargetRepo: async () => repoResolution,
+        createAuthenticatedRepo: () => ({
+          repo,
+          cloneUrl: "https://github.com/jhowliu/agent-cage.git",
+          redactedCloneUrl: "https://github.com/jhowliu/agent-cage.git",
+        }),
+        createDockerSandbox: () => fakeSandbox([]),
+        createShellRunner: () => shell,
+        runIndependentReview: async (input) => {
+          reviewedDiff = input.diff;
+          return passingReview();
+        },
+        publishSuccessfulRun: async (input) => ({
+          branchName: input.branchName ?? "agent-cage/reports",
+          commitMessage: "reports",
+          prTitle: "reports",
+          prBody: "body",
+          prUrl: "https://github.com/jhowliu/agent-cage/pull/107",
+        }),
+      },
+    );
+
+    assert.equal(result.status, "succeeded");
+    assert.equal(agentCalls, 2);
+    const runDir = join(cwd, ".agent-cage", "runs", "run-reports");
+    const artifact = async (name: string): Promise<string> =>
+      await readFile(join(runDir, name), "utf8");
+
+    assert.match(
+      await artifact("setup.log"),
+      /Report paths: 2 patterns kept out of the change\./,
+    );
+
+    // The failing verify's report is kept, redacted; the planted file was cleared first.
+    const failing = await artifact("verify-1-reports/reports/junit.xml");
+    assert.match(failing, /failures="1"/);
+    assert.doesNotMatch(failing, /token-value/);
+    const firstManifest = JSON.parse(await artifact("verify-1-reports.json"));
+    assert.deepEqual(
+      firstManifest.files.map(
+        (file: { kind: string; path: string }) => `${file.kind} ${file.path}`,
+      ),
+      ["junit reports/junit.xml", "evidence shots/home.png"],
+    );
+    await assert.rejects(artifact("verify-1-reports/shots/planted.png"));
+    const retryPrompt = await artifact("implementation-prompt-2.md");
+    assert.match(retryPrompt, /Verification failed for command/);
+    assert.doesNotMatch(retryPrompt, /Reports:/);
+
+    assert.match(await artifact("verify-2-reports/reports/junit.xml"), /failures="0"/);
+    assert.equal(await artifact("verify-2-reports/shots/home.png"), "PNG");
+    assert.match(
+      await artifact("verify.log"),
+      /Reports: junit 1, evidence 1 in verify-2-reports\/\./,
+    );
+
+    // Report files never enter the change.
+    assert.match(reviewedDiff, /src\/app\.js/);
+    assert.doesNotMatch(reviewedDiff, /reports\/junit\.xml|shots\//);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+    await rm(repoDir, { recursive: true, force: true });
+  }
+});
