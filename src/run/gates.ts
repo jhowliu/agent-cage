@@ -29,10 +29,12 @@ import type { FailureCode, PhaseName, ReviewDecision, RunStatus } from "../state
 import { RunFailureError } from "./errors.js";
 import { formatReviewIssueContext } from "./prompts.js";
 import { formatRedGreenSummary, type RedGreenReport } from "./red-green.js";
+import type { ReportCollection } from "./reports.js";
 
+/** `reports` is null when the config declares no report files. */
 export type VerificationResult =
-  | { passed: true; summary: string; items: string[] }
-  | { passed: false; feedback: string };
+  | { passed: true; summary: string; items: string[]; reports: ReportCollection | null }
+  | { passed: false; feedback: string; reports: ReportCollection | null };
 
 type RunGatePhaseBody = () => Promise<string | undefined>;
 

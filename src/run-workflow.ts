@@ -5,7 +5,12 @@ import {
   hasComposeServices,
   type ComposeProject,
 } from "./compose.js";
-import type { AgentCageConfig, ExecutionMode, RedGreenConfig } from "./config.js";
+import type {
+  AgentCageConfig,
+  ExecutionMode,
+  RedGreenConfig,
+  ReportsConfig,
+} from "./config.js";
 import type { CommandCredentialIntent, RunCredentials } from "./credentials.js";
 import {
   buildRuntimeImage,
@@ -33,6 +38,14 @@ import {
   type VerificationResult,
 } from "./run/gates.js";
 import { RunJournal } from "./run/journal.js";
+import {
+  clearReports,
+  collectReports,
+  formatReportSummary,
+  hasReports,
+  prepareReportPaths,
+  type ReportCollection,
+} from "./run/reports.js";
 import { buildImplementationPrompt, buildTestFirstPrompt } from "./run/prompts.js";
 import {
   checkGreen,
@@ -246,11 +259,15 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunAgentCage
 
     const shellRunner = shell;
 
-    if (context.config.setup.length > 0) {
+    const reportsConfig = context.config.reports;
+    if (context.config.setup.length > 0 || hasReports(reportsConfig)) {
       await journal.setRunStatus("setup");
       try {
         await journal.runPhase("setup", async () => {
           const logs: string[] = [];
+          if (hasReports(reportsConfig)) {
+            logs.push(await prepareReportPaths(shellRunner, reportsConfig));
+          }
           for (const command of context.config.setup) {
             logs.push(
               await requiredShell(
@@ -588,6 +605,8 @@ async function runImplementationLoop(input: {
       journal: input.journal,
       shell: input.shell,
       commands: input.context.config.verify,
+      reports: input.context.config.reports,
+      iteration,
       redactor: input.redactor,
       commandOptions: runtimeCommandCredentials("verify", input.context),
     });
@@ -900,12 +919,43 @@ async function runVerificationCommands(input: {
   journal: RunJournal;
   shell: ShellRunner;
   commands: string[];
+  reports: ReportsConfig;
+  iteration: number;
   redactor: (input: string) => string;
   commandOptions?: DockerCommandOptions | undefined;
 }): Promise<VerificationResult> {
   const items: string[] = [];
   const phase = await input.journal.startPhase("verify");
   const logs: string[] = [];
+  const reports = hasReports(input.reports) ? input.reports : null;
+  const recordCommands = async (status: "passed" | "failed"): Promise<void> => {
+    await input.journal.recordVerificationCommands({
+      status,
+      commandCount: input.commands.length,
+      passedCount: items.length,
+      logRef: phase.logPath,
+    });
+  };
+  // Collected after the commands ran, whether they passed or failed: a
+  // failing test report is what explains the failure.
+  const collect = async (): Promise<ReportCollection | null> => {
+    if (reports === null) return null;
+    const collection = await collectReports({
+      shell: input.shell,
+      journal: input.journal,
+      config: reports,
+      iteration: input.iteration,
+    });
+    logs.push(formatReportSummary(collection));
+    return collection;
+  };
+
+  try {
+    if (reports !== null) await clearReports(input.shell, reports);
+  } catch (error) {
+    await phase.fail(formatError(error));
+    throw error;
+  }
 
   for (const command of input.commands) {
     let result: Awaited<ReturnType<ShellRunner["run"]>>;
@@ -913,12 +963,7 @@ async function runVerificationCommands(input: {
       result = await input.shell.run(command, input.commandOptions);
     } catch (error) {
       await phase.fail(formatError(error));
-      await input.journal.recordVerificationCommands({
-        status: "failed",
-        commandCount: input.commands.length,
-        passedCount: items.length,
-        logRef: phase.logPath,
-      });
+      await recordCommands("failed");
       throw error;
     }
 
@@ -927,46 +972,50 @@ async function runVerificationCommands(input: {
     if (result.exitCode === 124) {
       const redactedLog = input.redactor(logs.join("\n"));
       await phase.fail(redactedLog);
-      await input.journal.recordVerificationCommands({
-        status: "failed",
-        commandCount: input.commands.length,
-        passedCount: items.length,
-        logRef: phase.logPath,
-      });
+      await recordCommands("failed");
       throw new RunFailureError("timeout", redactedLog);
     }
 
     if (result.exitCode !== 0) {
-      const redactedLog = input.redactor(logs.join("\n"));
-      await phase.fail(redactedLog);
-      await input.journal.recordVerificationCommands({
-        status: "failed",
-        commandCount: input.commands.length,
-        passedCount: items.length,
-        logRef: phase.logPath,
-      });
+      // The agent gets the command output only: it cannot read the run directory.
+      const commandLog = input.redactor(logs.join("\n"));
+      let collection: ReportCollection | null;
+      try {
+        collection = await collect();
+      } catch (error) {
+        await phase.fail(formatError(error));
+        await recordCommands("failed");
+        throw error;
+      }
+      await phase.fail(input.redactor(logs.join("\n")));
+      await recordCommands("failed");
       return {
         passed: false,
-        feedback: `Verification failed for command: ${input.redactor(command)}\n${redactedLog}`,
+        feedback: `Verification failed for command: ${input.redactor(command)}\n${commandLog}`,
+        reports: collection,
       };
     }
 
     items.push(`\`${command}\` passed`);
   }
 
+  let collection: ReportCollection | null;
+  try {
+    collection = await collect();
+  } catch (error) {
+    await phase.fail(formatError(error));
+    await recordCommands("failed");
+    throw error;
+  }
   const summary = input.redactor(logs.join("\n"));
   await phase.pass(summary);
-  await input.journal.recordVerificationCommands({
-    status: "passed",
-    commandCount: input.commands.length,
-    passedCount: items.length,
-    logRef: phase.logPath,
-  });
+  await recordCommands("passed");
 
   return {
     passed: true,
     summary,
     items,
+    reports: collection,
   };
 }
 

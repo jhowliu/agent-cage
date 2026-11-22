@@ -304,6 +304,20 @@ export class RunJournal {
     return path;
   }
 
+  /**
+   * Writes a file the verify commands produced. Text is redacted like any other
+   * artifact; binary files, such as screenshots, are written as they are. No
+   * event is recorded per file: the collection's manifest is the artifact.
+   */
+  async writeReportFile(name: string, data: Uint8Array): Promise<string> {
+    const text = decodeUtf8(data);
+    return await this.#store.writeArtifact(
+      this.#context.runId,
+      name,
+      text === null ? data : this.#redact(text),
+    );
+  }
+
   async writeJsonArtifact(name: string, value: unknown): Promise<void> {
     await this.writeArtifact(name, `${JSON.stringify(value, null, 2)}\n`);
   }
@@ -546,6 +560,15 @@ function progressEventFromRunEvent(event: RunEvent): RunProgressEvent | null {
       const exhaustiveEvent: never = event;
       return exhaustiveEvent;
     }
+  }
+}
+
+/** The file as UTF-8 text, or null when it is binary. */
+function decodeUtf8(data: Uint8Array): string | null {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(data);
+  } catch {
+    return null;
   }
 }
 

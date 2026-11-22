@@ -54,6 +54,42 @@ const redGreenConfigSchema = z.object({
 
 export type RedGreenConfig = z.infer<typeof redGreenConfigSchema>;
 
+/**
+ * A repository-relative glob for files the verify commands write. It is
+ * matched as a git pathspec and written to the sandbox's git exclude file, so
+ * it must stay inside the repository and fit on one line.
+ */
+const reportGlobSchema = z
+  .string()
+  .min(1)
+  .refine((glob) => isRepositoryGlob(glob), {
+    message:
+      "must be a path relative to the repository root, without '..' segments, a leading '/', or surrounding spaces",
+  });
+
+/**
+ * Files the verify commands write, by kind: JUnit XML test reports, LCOV
+ * coverage, and evidence such as screenshots. Agent Cage clears them before
+ * each verify, keeps them out of the change, and collects them afterwards.
+ */
+const reportsConfigSchema = z.object({
+  junit: z.array(reportGlobSchema).default([]),
+  lcov: z.array(reportGlobSchema).default([]),
+  evidence: z.array(reportGlobSchema).default([]),
+});
+
+export type ReportsConfig = z.infer<typeof reportsConfigSchema>;
+
+export function isRepositoryGlob(glob: string): boolean {
+  return (
+    glob.trim() === glob &&
+    !glob.startsWith("/") &&
+    !glob.includes("\\") &&
+    !/[\u0000-\u001f\u007f]/.test(glob) &&
+    !glob.split("/").includes("..")
+  );
+}
+
 const defaultActionsLabels = {
   run: "agent-cage:run",
   in_progress: "agent-cage:in-progress",
@@ -65,6 +101,7 @@ export const agentCageConfigSchema = z
   .object({
     setup: z.array(z.string()).default([]),
     verify: z.array(z.string()).min(1),
+    reports: reportsConfigSchema.default(() => ({ junit: [], lcov: [], evidence: [] })),
     services: z
       .object({
         compose: z.string().nullable().default(null),
@@ -213,6 +250,7 @@ export type ConfigParseResult = {
 const knownTopLevelKeys = new Set([
   "setup",
   "verify",
+  "reports",
   "services",
   "runtime",
   "agent",

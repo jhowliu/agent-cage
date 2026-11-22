@@ -106,6 +106,11 @@ setup:
 verify:
   - npm test
 
+reports:
+  junit: ["reports/junit.xml"]
+  lcov: ["coverage/lcov.info"]
+  evidence: ["test-results/**/*.png"]
+
 services:
   compose: .agent-cage/docker-compose.yml
   ready:
@@ -190,6 +195,8 @@ Codex review runs in Codex's read-only sandbox. Claude Code has no OS-level sand
 
 `guards.red_green` makes runs [write tests first](#red-green-test-first). It is off unless configured.
 
+`reports` names the files the verify commands write; see [Reports](#reports). It is empty unless configured.
+
 `actions.enabled` generates a managed issue workflow. Local execution remains Docker-based; the generated workflow sets `AGENT_CAGE_EXECUTION=direct` for the disposable Actions runner. Actions services and an optional job container are configured under `actions`, while local Compose services remain under `services`.
 
 ## Red-Green (Test First)
@@ -231,6 +238,18 @@ Limits:
 - When tests run from build output, `run` must build first. Setup gives no default for a test script that builds first.
 - Tests inside source files, such as Rust `#[cfg(test)]` modules, cannot be written apart from the code; keep `test_files` to separate test files.
 - The checks work per file: a file with one failing new test and one empty one still counts as red.
+
+## Reports
+
+`reports` lists the files the `verify` commands write besides their output, by kind: `junit` for JUnit XML test reports, `lcov` for LCOV coverage, and `evidence` for anything a reviewer should see, such as screenshots or a Playwright trace. Each entry is a glob relative to the repository root, matched as a git pathspec: `*` stays within a directory and `**` crosses them, so `test-results/**/*.png` matches PNGs at any depth.
+
+- **Setup** adds the patterns to the sandbox clone's `.git/info/exclude`, so report files never enter the diff or the pull request, even when the repository does not ignore them. A pattern that matches a tracked file fails the run with `invalid_config`, since clearing reports would delete it.
+- **Before each verify**, Agent Cage deletes untracked files that match the patterns. Only files that verify writes are collected, never ones left by an earlier iteration or written by the agent.
+- **After each verify**, passed or failed, Agent Cage copies the matching files into the run directory under `verify-<iteration>-reports/`, at their repository paths, and writes the list to `verify-<iteration>-reports.json`. Text files are redacted like other artifacts. The verify log ends with a line such as `Reports: junit 1, evidence 3 in verify-2-reports/.`
+
+Only regular files are copied: symlinks and special files are skipped. A file over 10 MB, files past 25 MB in total, and files past the first 200 are skipped too. The manifest lists each skipped file and why. A file matching several kinds is kept once, as the first of `junit`, `lcov`, `evidence`.
+
+Point each tool's output at the paths you list, for example `vitest run --reporter=junit --outputFile=reports/junit.xml` or Playwright's default `test-results/`.
 
 ## Doctor
 
