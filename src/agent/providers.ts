@@ -47,12 +47,24 @@ export type AgentCommandInput =
       outputSchema: Record<string, unknown>;
     };
 
+/**
+ * An agent's shell command and the prompt to write to its stdin. The prompt is
+ * never an argument: the command runs as `sh -lc <command>`, and Linux fails
+ * any single argument over 128 KiB, which a review prompt with a large diff
+ * reaches. Run it with `{ input: stdin }`.
+ */
+export type AgentCommand = { command: string; stdin: string };
+
 const codexOutputSchemaPath = "/tmp/agent-cage-review-output-schema.json";
 
 export function agentShellCommand(
   agent: AgentAssignment,
   input: AgentCommandInput,
-): string {
+): AgentCommand {
+  return { command: agentCommandLine(agent, input), stdin: input.prompt };
+}
+
+function agentCommandLine(agent: AgentAssignment, input: AgentCommandInput): string {
   switch (agent.provider) {
     case "codex":
       return codexShellCommand(agent.model, input);
@@ -62,10 +74,9 @@ export function agentShellCommand(
           ? {
               access: "read-only",
               model: agent.model,
-              prompt: input.prompt,
               outputSchema: input.outputSchema,
             }
-          : { access: "workspace-write", model: agent.model, prompt: input.prompt },
+          : { access: "workspace-write", model: agent.model },
       );
     default: {
       const exhaustiveProvider: never = agent.provider;
@@ -122,7 +133,6 @@ function codexShellCommand(model: string, input: AgentCommandInput): string {
       return codexExecCommand({
         model,
         sandbox: "workspace-write",
-        prompt: input.prompt,
         bypassSandbox,
       });
     case "read-only": {
@@ -133,7 +143,6 @@ function codexShellCommand(model: string, input: AgentCommandInput): string {
         model,
         sandbox: "read-only",
         outputSchemaPath: codexOutputSchemaPath,
-        prompt: input.prompt,
         bypassSandbox,
       })}`;
     }

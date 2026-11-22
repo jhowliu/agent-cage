@@ -215,15 +215,13 @@ async function runCodexReviewOnHost(input: ReviewAgentRunInput): Promise<string>
       input.cwd,
       "--output-schema",
       outputSchemaPath,
-      input.prompt,
+      "-",
     ];
 
-    if (input.env === undefined) {
-      const result = await execa("codex", args);
-      return result.stdout;
-    }
-
-    const result = await execa("codex", args, { env: input.env });
+    const result = await execa("codex", args, {
+      input: input.prompt,
+      ...(input.env === undefined ? {} : { env: input.env }),
+    });
     return result.stdout;
   } finally {
     await rm(tempDirectory, { recursive: true, force: true });
@@ -233,15 +231,14 @@ async function runCodexReviewOnHost(input: ReviewAgentRunInput): Promise<string>
 async function runClaudeReviewOnHost(input: ReviewAgentRunInput): Promise<string> {
   const args = [
     "-p",
-    input.prompt,
     ...claudeOptionArgs({
       access: "read-only",
       model: input.agent.model,
-      prompt: input.prompt,
       outputSchema: input.outputSchema,
     }),
   ];
   const result = await execa("claude", args, {
+    input: input.prompt,
     cwd: input.cwd,
     env: { ...input.env, DISABLE_AUTOUPDATER: "1" },
   });
@@ -314,7 +311,8 @@ When the decision is "pass", write "prDescription": the description of the pull 
 Issue context:
 ${input.issueContext}
 
-Verification summary:
+Verification results:
+Every verify command passed. Each is shown with the last lines of its output, where test runners print their totals.
 ${input.verificationSummary}
 ${input.redGreenSummary === undefined ? "" : formatRedGreenSection(input.redGreenSummary)}
 Review policy:

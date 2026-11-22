@@ -445,6 +445,8 @@ Inside a job container, service containers share a network and are reachable by 
 
 Agent Cage relies on Codex CLI's native `AGENTS.md` handling for repository implementation guidance. It does not inject the contents of `AGENTS.md`, `.agent-cage/instructions.md`, `.github/copilot-instructions.md`, or `CLAUDE.md` into implementation or review prompts.
 
+The review prompt holds the issue, the diff, the red-green results when the repo uses them, and each verify command that passed with the last 15 lines of its stdout and stderr, where test runners print their totals. The full verify output is for people: it stays in `verify.log`. Agents get their prompts on stdin, never as a command argument, so a large diff does not hit Linux's 128 KiB limit on a single argument.
+
 Independent review has an optional project policy file at `.agent-cage/review-policy.md`. The review policy may add stricter project-specific checks, but it cannot override Agent Cage built-in reviewer rules or weaken blocking criteria. Missing review policy files are allowed.
 
 A passing review also writes the PR description. The review prompt asks it to follow the pull request rules in the `AGENTS.md` and `CLAUDE.md` files that apply to the changed paths, so rules for PR descriptions belong there, where people opening PRs read them too, not in the review policy. Agent Cage appends the verification, review status, risks, run id, and issue link after the description, and opens the PR with a one-line summary when the review leaves the description out.
