@@ -31,6 +31,7 @@ export type ProjectDetection = {
   redGreen: RedGreenConfig | null;
   // How to make the test runner write JUnit XML, when it is known and safe.
   junit: JunitOffer | null;
+  evidence: EvidenceOffer | null;
 };
 
 export const junitRunners = ["node:test", "vitest", "jest", "pytest"] as const;
@@ -45,6 +46,12 @@ export type JunitOffer = {
   replacement: string;
   /** The `reports.junit` glob the runner writes to. */
   glob: string;
+};
+
+export type EvidenceOffer = {
+  tools: ("playwright" | "cypress")[];
+  globs: string[];
+  notes: string[];
 };
 
 const junitFile = "reports/junit.xml";
@@ -62,6 +69,7 @@ type EcosystemDetection = {
   toolchains: ProjectToolchain[];
   redGreen?: RedGreenConfig | null;
   junit?: JunitOffer | null;
+  evidence?: EvidenceOffer | null;
 };
 
 export function projectFilesAt(cwd: string): ProjectFiles {
@@ -110,6 +118,8 @@ export async function detectProject(files: ProjectFiles): Promise<ProjectDetecti
     redGreen:
       detections.find((detection) => detection.redGreen != null)?.redGreen ?? null,
     junit: detections.find((detection) => detection.junit != null)?.junit ?? null,
+    evidence:
+      detections.find((detection) => detection.evidence != null)?.evidence ?? null,
   };
 }
 
@@ -126,7 +136,40 @@ async function detectNode(files: ProjectFiles): Promise<EcosystemDetection | nul
     toolchains: manager.toolchains,
     redGreen: nodeRedGreen(manager.run, packageJson),
     junit: nodeJunit(manager.run, packageJson),
+    evidence: await nodeEvidence(files, packageJson.dependencies),
   };
+}
+
+async function nodeEvidence(
+  files: ProjectFiles,
+  dependencies: readonly string[],
+): Promise<EvidenceOffer | null> {
+  const offer: EvidenceOffer = { tools: [], globs: [], notes: [] };
+  if (dependencies.includes("@playwright/test")) {
+    offer.tools.push("playwright");
+    offer.globs.push("test-results/**/*.png", "test-results/**/*.webm");
+    let screenshotsEnabled = false;
+    for (const extension of ["ts", "js", "mjs", "cjs"]) {
+      const config = await files.read(`playwright.config.${extension}`);
+      if (
+        config !== null &&
+        /\bscreenshot\s*:\s*(['"])(?:on|only-on-failure)\1/.test(config)
+      ) {
+        screenshotsEnabled = true;
+      }
+    }
+    if (!screenshotsEnabled) {
+      offer.notes.push(
+        "Playwright saves screenshots only with use.screenshot set in playwright.config; setup does not change it.",
+      );
+    }
+  }
+  if (dependencies.includes("cypress")) {
+    offer.tools.push("cypress");
+    offer.globs.push("cypress/screenshots/**/*.png", "cypress/videos/**/*.mp4");
+    offer.notes.push("Cypress records video only with video: true.");
+  }
+  return offer.tools.length === 0 ? null : offer;
 }
 
 /**

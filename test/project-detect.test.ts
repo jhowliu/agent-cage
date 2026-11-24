@@ -30,7 +30,7 @@ function packageJson(
   });
 }
 
-type Expected = Omit<ProjectDetection, "junit">;
+type Expected = Omit<ProjectDetection, "junit" | "evidence">;
 
 const none: Expected = {
   ecosystems: [],
@@ -295,7 +295,11 @@ const cases: {
 
 for (const { name, files: entries, expected } of cases) {
   test(`detectProject: ${name}`, async () => {
-    const { junit: _junit, ...detected } = await detectProject(files(entries));
+    const {
+      junit: _junit,
+      evidence: _evidence,
+      ...detected
+    } = await detectProject(files(entries));
     assert.deepEqual(detected, expected);
   });
 }
@@ -394,3 +398,53 @@ test("generateRuntimeDockerfile keeps toolchain PATHs for the sandbox's login sh
     "toolchains installed into /usr/local/bin need no PATH changes",
   );
 });
+
+const screenshotNote =
+  "Playwright saves screenshots only with use.screenshot set in playwright.config; setup does not change it.";
+const videoNote = "Cypress records video only with video: true.";
+const playwrightGlobs = ["test-results/**/*.png", "test-results/**/*.webm"];
+const cypressGlobs = ["cypress/screenshots/**/*.png", "cypress/videos/**/*.mp4"];
+
+test("detectProject offers browser evidence from dependencies and devDependencies", async () => {
+  for (const field of ["dependencies", "devDependencies"]) {
+    for (const [dependencies, expected] of [
+      [
+        { "@playwright/test": "*" },
+        { tools: ["playwright"], globs: playwrightGlobs, notes: [screenshotNote] },
+      ],
+      [{ cypress: "*" }, { tools: ["cypress"], globs: cypressGlobs, notes: [videoNote] }],
+      [
+        { "@playwright/test": "*", cypress: "*" },
+        {
+          tools: ["playwright", "cypress"],
+          globs: [...playwrightGlobs, ...cypressGlobs],
+          notes: [screenshotNote, videoNote],
+        },
+      ],
+      [{}, null],
+    ] as const) {
+      const detected = await detectProject(
+        files({
+          "package.json": JSON.stringify({ [field]: dependencies }),
+        }),
+      );
+      assert.deepEqual(detected.evidence, expected);
+    }
+  }
+  assert.equal((await detectProject(files({}))).evidence, null);
+});
+
+for (const extension of ["ts", "js", "mjs", "cjs"]) {
+  for (const mode of ["on", "only-on-failure", "off"]) {
+    test(`Playwright screenshot note for ${extension} with screenshot ${mode}`, async () => {
+      const detected = await detectProject(
+        files({
+          "package.json": packageJson({}, undefined, { "@playwright/test": "*" }),
+          [`playwright.config.${extension}`]: `export default { use: { screenshot: '${mode}' } }`,
+        }),
+      );
+      assert.deepEqual(detected.evidence?.notes, mode === "off" ? [screenshotNote] : []);
+      assert.deepEqual(detected.evidence?.globs, playwrightGlobs);
+    });
+  }
+}
