@@ -2,7 +2,12 @@ setup:
   - npm ci
 
 verify:
-  - npm test
+  # `npm test` with a JUnit report next to the normal output, so the PR shows
+  # test counts and a failed verify tells the agent which tests failed.
+  - mkdir -p reports && npm run build && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=reports/junit.xml "dist/test/**/*.test.js"
+
+reports:
+  junit: ["reports/junit.xml"]
 
 agent:
   implement:
