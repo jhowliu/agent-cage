@@ -30,7 +30,9 @@ function packageJson(
   });
 }
 
-const none: ProjectDetection = {
+type Expected = Omit<ProjectDetection, "junit">;
+
+const none: Expected = {
   ecosystems: [],
   setup: [],
   verify: [],
@@ -51,7 +53,7 @@ function pytestRedGreen(pytest: string): ProjectDetection["redGreen"] {
 const cases: {
   name: string;
   files: Record<string, string>;
-  expected: ProjectDetection;
+  expected: Expected;
 }[] = [
   {
     name: "npm with a lockfile",
@@ -293,9 +295,55 @@ const cases: {
 
 for (const { name, files: entries, expected } of cases) {
   test(`detectProject: ${name}`, async () => {
-    assert.deepEqual(await detectProject(files(entries)), expected);
+    const { junit: _junit, ...detected } = await detectProject(files(entries));
+    assert.deepEqual(detected, expected);
   });
 }
+
+const junitNodeTest =
+  "mkdir -p reports && npm test -- --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=reports/junit.xml";
+
+test("detectProject offers JUnit for runners the test script runs directly", async () => {
+  const detect = async (
+    scripts: Record<string, string>,
+    devDependencies?: Record<string, string>,
+  ) =>
+    (
+      await detectProject(
+        files({
+          "package.json": packageJson(scripts, undefined, devDependencies),
+          "package-lock.json": "{}",
+        }),
+      )
+    ).junit;
+
+  assert.deepEqual(await detect({ test: "node --test" }), {
+    runner: "node:test",
+    command: "npm test",
+    replacement: junitNodeTest,
+    glob: "reports/junit.xml",
+  });
+  assert.match(
+    (await detect({ test: "vitest run" }))?.replacement ?? "",
+    /npm test -- --reporter=default --reporter=junit --outputFile\.junit=reports\/junit\.xml$/,
+  );
+  assert.equal((await detect({ test: "jest" }))?.runner ?? null, null);
+  assert.equal(
+    (await detect({ test: "jest" }, { "jest-junit": "^16.0.0" }))?.runner,
+    "jest",
+  );
+  // Chained or wrapped scripts would send the flags to the wrong command.
+  assert.equal(await detect({ test: "npm run build && node --test dist" }), null);
+  assert.equal(await detect({ test: "make test" }), null);
+});
+
+test("detectProject offers JUnit for pytest", async () => {
+  const detected = await detectProject(files({ "pyproject.toml": "", "uv.lock": "" }));
+  assert.equal(
+    detected.junit?.replacement,
+    "mkdir -p reports && uv run pytest --junitxml=reports/junit.xml",
+  );
+});
 
 test("generateRuntimeDockerfile installs toolchains as root in a fixed order", () => {
   const dockerfile = generateRuntimeDockerfile("registry.example.com/base:1", [

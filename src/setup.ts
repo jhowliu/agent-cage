@@ -11,7 +11,7 @@ import {
   defaultAgentModels,
   type AgentProvider,
 } from "./agent/providers.js";
-import type { AgentCageConfig, RedGreenConfig } from "./config.js";
+import type { AgentCageConfig, RedGreenConfig, ReportsConfig } from "./config.js";
 import {
   loadAgentCageConfigFile,
   updateAgentCageConfigFile,
@@ -46,6 +46,7 @@ import {
   detectProject,
   generateRuntimeDockerfile,
   projectFilesAt,
+  type JunitOffer,
   type ProjectToolchain,
 } from "./project-detect.js";
 import { readPackageVersion } from "./version.js";
@@ -82,6 +83,7 @@ type ProjectDefaults = {
   verify: string[];
   toolchains: ProjectToolchain[];
   redGreen: RedGreenConfig | null;
+  junit: JunitOffer | null;
   baseBranch: string;
 };
 
@@ -149,14 +151,16 @@ export async function setupProject(
       existing?.setup ?? detected.setup,
       prompt,
     );
-    const verify = await chooseCommands(
+    const chosenVerify = await chooseCommands(
       "verification",
       existing?.verify ?? detected.verify,
       prompt,
     );
-    if (verify.length === 0) {
+    if (chosenVerify.length === 0) {
       throw new Error("At least one verification command is required.");
     }
+    const junit = await chooseJunit(existing, detected.junit, chosenVerify, prompt);
+    const verify = junit === null ? chosenVerify : junit.verify;
     const redGreen = await chooseRedGreen(existing, detected.redGreen, prompt);
     const runtimeNotices: string[] = [];
     const runtimeDockerfile = await chooseRuntimeDockerfile(
@@ -195,6 +199,7 @@ export async function setupProject(
       execution: "docker",
       actions,
       ...(existing === null ? { agent } : {}),
+      ...(junit === null ? {} : { reports: junit.reports }),
       ...(redGreen === null
         ? {}
         : {
@@ -843,11 +848,11 @@ function toActionsRuntime(
 }
 
 async function detectProjectDefaults(cwd: string): Promise<ProjectDefaults> {
-  const { setup, verify, toolchains, redGreen } = await detectProject(
+  const { setup, verify, toolchains, redGreen, junit } = await detectProject(
     projectFilesAt(cwd),
   );
   const baseBranch = await detectBaseBranch(cwd);
-  return { setup, verify, toolchains, redGreen, baseBranch };
+  return { setup, verify, toolchains, redGreen, junit, baseBranch };
 }
 
 /**
@@ -869,6 +874,39 @@ async function chooseRedGreen(
   ))
     ? detected
     : null;
+}
+
+/**
+ * Offers the runner's JUnit reporter: the verify command that runs the tests
+ * gets the reporter flags, and `reports.junit` the file it writes. Without
+ * prompts, only a new config gets it, like red-green. A config that already
+ * lists JUnit files is left alone.
+ */
+async function chooseJunit(
+  existing: AgentCageConfig | null,
+  offer: JunitOffer | null,
+  verify: readonly string[],
+  prompts: SetupPrompts | null,
+): Promise<{ verify: string[]; reports: ReportsConfig } | null> {
+  if (offer === null || !verify.includes(offer.command)) return null;
+  if ((existing?.reports.junit.length ?? 0) > 0) return null;
+  if (prompts === null && existing !== null) return null;
+  if (
+    prompts !== null &&
+    !(await prompts.confirm(
+      `Show test results in the PR (${offer.runner} JUnit report)?\n  - verify: ${offer.command} -> ${offer.replacement}\n  - reports.junit: ${offer.glob}`,
+      true,
+    ))
+  ) {
+    return null;
+  }
+  const base = existing?.reports ?? { junit: [], lcov: [], evidence: [] };
+  return {
+    verify: verify.map((command) =>
+      command === offer.command ? offer.replacement : command,
+    ),
+    reports: { ...base, junit: [offer.glob] },
+  };
 }
 
 async function detectBaseBranch(cwd: string): Promise<string> {

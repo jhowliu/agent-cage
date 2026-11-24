@@ -11,6 +11,7 @@ import {
   type DockerSandboxOptions,
 } from "../src/docker.js";
 import type { IssueContext } from "../src/issue.js";
+import { formatPrBody } from "../src/publish.js";
 import {
   NoDiffError,
   type CommandResult,
@@ -2123,6 +2124,151 @@ verify:
     assert.equal(recorded.pullRequest.url, revision.pullRequest.url);
   } finally {
     await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+async function runWithJunitVerify(input: {
+  runId: string;
+  agentSteps: (() => Promise<void>)[];
+  repoDir: string;
+  cwd: string;
+}): Promise<{ verification: string[]; prBody: string; runDir: string }> {
+  const host = createHostShellRunner(input.repoDir);
+  let agentCalls = 0;
+  const shell: ShellRunner = {
+    async run(command, options) {
+      if (command.includes("git clone") || command.includes("git fetch origin")) {
+        return commandResult();
+      }
+      if (command.includes("codex exec")) {
+        const step = input.agentSteps[agentCalls];
+        agentCalls += 1;
+        assert.ok(step, `unexpected agent call ${agentCalls}`);
+        await step();
+        return commandResult("done");
+      }
+      return await host.run(command, options);
+    },
+  };
+  let verification: string[] = [];
+  let prBody = "";
+  const result = await runAgentCage(
+    { cwd: input.cwd, issueUrl: issue.url },
+    {
+      executionMode: "docker",
+      generateRunId: () => input.runId,
+      readEnv: async () => ({ GITHUB_TOKEN: "token-value" }),
+      findCodexAuthFile: async () => null,
+      fetchIssueContext: async () => issue,
+      resolveTargetRepo: async () => repoResolution,
+      createAuthenticatedRepo: () => ({
+        repo,
+        cloneUrl: "https://github.com/jhowliu/agent-cage.git",
+        redactedCloneUrl: "https://github.com/jhowliu/agent-cage.git",
+      }),
+      createDockerSandbox: () => fakeSandbox([]),
+      createShellRunner: () => shell,
+      runIndependentReview: async () => passingReview(),
+      publishSuccessfulRun: async (publishInput) => {
+        verification = publishInput.metadata.verification;
+        prBody = formatPrBody({ issue, metadata: publishInput.metadata });
+        return {
+          branchName: publishInput.branchName ?? "agent-cage/junit",
+          commitMessage: "junit",
+          prTitle: "junit",
+          prBody,
+          prUrl: "https://github.com/jhowliu/agent-cage/pull/108",
+        };
+      },
+    },
+  );
+  assert.equal(result.status, "succeeded");
+  return {
+    verification,
+    prBody,
+    runDir: join(input.cwd, ".agent-cage", "runs", input.runId),
+  };
+}
+
+test("runAgentCage shows JUnit results in the PR body Verification section", async () => {
+  const cwd = await createProject(`
+verify:
+  - |-
+    mkdir -p reports
+    printf '<testsuite><testcase classname="A" name="1"/><testcase classname="A" name="2"/><testcase classname="A" name="3"/><testcase classname="A" name="4"><skipped/></testcase></testsuite>' > reports/junit.xml
+reports:
+  junit: ["reports/*.xml"]
+`);
+  const repoDir = await createGitRepo({ "src/app.js": "export const state = 'new';\n" });
+  try {
+    const { verification, prBody: body } = await runWithJunitVerify({
+      runId: "run-junit-pass",
+      repoDir,
+      cwd,
+      agentSteps: [
+        async () => {
+          await writeFile(join(repoDir, "src/app.js"), "export const state = 'x';\n");
+        },
+      ],
+    });
+
+    assert.match(
+      body,
+      /Tests: 3 passed, 0 failed, 1 skipped \(JUnit: reports\/junit\.xml\)/,
+    );
+    assert.equal(verification.length, 2);
+    assert.match(verification[0] ?? "", /passed$/);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+    await rm(repoDir, { recursive: true, force: true });
+  }
+});
+
+test("runAgentCage feeds failed JUnit tests, redacted, into the retry prompt", async () => {
+  const cwd = await createProject(`
+verify:
+  - |-
+    mkdir -p reports
+    if grep -q fixed src/app.js; then
+      printf '<testsuite><testcase classname="A" name="ok"/></testsuite>' > reports/junit.xml
+    else
+      printf '<testsuite><testcase classname="Calc" name="adds"><failure message="expected 3 got token-value&#10;trace">x</failure></testcase><testcase classname="Calc" name="subtracts"><error message="TypeError: nope"/></testcase></testsuite>' > reports/junit.xml
+      echo marker-$((40+2))
+      exit 1
+    fi
+reports:
+  junit: ["reports/*.xml"]
+agent:
+  max_iterations: 2
+`);
+  const repoDir = await createGitRepo({ "src/app.js": "export const state = 'new';\n" });
+  try {
+    const { runDir } = await runWithJunitVerify({
+      runId: "run-junit-fail",
+      repoDir,
+      cwd,
+      agentSteps: [
+        async () => {
+          await writeFile(
+            join(repoDir, "src/app.js"),
+            "export const state = 'broken';\n",
+          );
+        },
+        async () => {
+          await writeFile(join(repoDir, "src/app.js"), "export const state = 'fixed';\n");
+        },
+      ],
+    });
+    const prompt = await readFile(join(runDir, "implementation-prompt-2.md"), "utf8");
+    const adds = prompt.indexOf("Calc > adds: expected 3 got ");
+    const subtracts = prompt.indexOf("Calc > subtracts: TypeError: nope");
+
+    assert.ok(adds >= 0 && subtracts > adds);
+    assert.ok(prompt.indexOf("marker-42") > subtracts);
+    assert.doesNotMatch(prompt, /token-value/);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+    await rm(repoDir, { recursive: true, force: true });
   }
 });
 
