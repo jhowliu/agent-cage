@@ -127,7 +127,51 @@ export function claudeFailureCode(stdout: string): AgentFailureCode | null {
       return "agent_model_unavailable";
     }
   }
+  return rejectedRateLimitEvents(stdout).length > 0 ? "agent_rate_limited" : null;
+}
+
+const claudeRateLimitEventSchema = z.object({
+  type: z.literal("rate_limit_event"),
+  rate_limit_info: z.object({
+    status: z.literal("rejected"),
+    rateLimitType: z.unknown().optional(),
+    resetsAt: z.unknown().optional(),
+  }),
+});
+
+function rejectedRateLimitEvents(
+  stdout: string,
+): z.infer<typeof claudeRateLimitEventSchema>[] {
+  return stdout.split(/\r?\n/).flatMap((line) => {
+    const event = claudeRateLimitEventSchema.safeParse(parseJsonLine(line));
+    return event.success ? [event.data] : [];
+  });
+}
+
+/** Reads a rejected usage limit and formats its epoch-seconds reset as UTC. */
+export function claudeRateLimitInfo(
+  stdout: string,
+): { rateLimitType: string; resetsAt: string } | null {
+  const schema = z.object({
+    rateLimitType: z.string().min(1),
+    resetsAt: z.number().finite(),
+  });
+  for (const event of rejectedRateLimitEvents(stdout)) {
+    const info = schema.safeParse(event.rate_limit_info);
+    if (!info.success) continue;
+    const reset = new Date(info.data.resetsAt * 1000);
+    if (!Number.isFinite(reset.getTime())) continue;
+    return { rateLimitType: info.data.rateLimitType, resetsAt: reset.toISOString() };
+  }
   return null;
+}
+
+export function claudeRateLimitMessage(stdout: string): string {
+  const info = claudeRateLimitInfo(stdout);
+  const limit = info === null ? "usage limit" : `${info.rateLimitType} usage limit`;
+  const reset =
+    info === null ? "the reset time is unavailable" : `it resets at ${info.resetsAt}`;
+  return `Claude Code reached its ${limit}; ${reset}. Rerun after that, or use ANTHROPIC_API_KEY for API billing.`;
 }
 
 function parseJsonLine(line: string): unknown {

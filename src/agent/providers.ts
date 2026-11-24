@@ -17,10 +17,10 @@ export type AgentAssignment = {
 
 export type AgentAssignments = Record<AgentRole, AgentAssignment>;
 
-/** Agent failures that a rerun cannot fix without changing credentials or config. */
+/** Recognized agent failures with specific recovery guidance. */
 export type AgentFailureCode = Extract<
   FailureCode,
-  "agent_auth_failed" | "agent_model_unavailable"
+  "agent_auth_failed" | "agent_model_unavailable" | "agent_rate_limited"
 >;
 
 export const defaultAgentModels = {
@@ -100,7 +100,7 @@ export function extractAgentResult(provider: AgentProvider, stdout: string): str
 }
 
 /**
- * Recognizes credential and model errors in an agent's output. Returns null
+ * Recognizes credential, model, and usage-limit errors in an agent's output. Returns null
  * for every other failure, which callers report as a generic role failure.
  */
 export function agentFailureCode(

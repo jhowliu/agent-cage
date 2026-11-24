@@ -403,3 +403,28 @@ test("doctor --probe skips agents when Docker is unavailable or in direct mode",
     await rm(direct, { recursive: true, force: true });
   }
 });
+
+test("doctor --probe explains Claude usage limits without raw stream JSON", async () => {
+  const cwd = await probeProject(twoAgentConfig);
+  try {
+    const result = await doctorProject(
+      cwd,
+      probeRunner(() => ({
+        exitCode: 1,
+        stdout:
+          '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1795505400,"rateLimitType":"five_hour","overageStatus":"rejected"}}',
+        stderr: "",
+      })),
+      { probe: true },
+    );
+    const probe = result.checks.find((check) => check.name === "agent-probe:implement");
+    assert.equal(probe?.status, "fail");
+    assert.equal(
+      probe?.message,
+      "Claude Code reached its five_hour usage limit; it resets at 2026-11-24T07:30:00.000Z. Rerun after that, or use ANTHROPIC_API_KEY for API billing.",
+    );
+  } finally {
+    await rm(globalEnvPath, { force: true });
+    await rm(cwd, { recursive: true, force: true });
+  }
+});

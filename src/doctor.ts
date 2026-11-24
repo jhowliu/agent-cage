@@ -1,3 +1,4 @@
+import { claudeRateLimitMessage } from "./agent/claude.js";
 import { execa } from "execa";
 import { access, readFile, stat } from "node:fs/promises";
 import { constants } from "node:fs";
@@ -278,6 +279,8 @@ function probeFailureMessage(input: {
       return input.agent.provider === "claude"
         ? `Claude Code rejected its credentials. Run \`claude setup-token\` and update CLAUDE_CODE_OAUTH_TOKEN in ${input.globalPath}.`
         : `Codex rejected its credentials. Check OPENAI_API_KEY in ${input.globalPath}, or run \`codex login\`.`;
+    case "agent_rate_limited":
+      return claudeRateLimitMessage(input.result.stdout);
     case "agent_model_unavailable":
       return [
         `${input.label} is not available to this account, or the CLI in ${input.image} is too old for it.`,
