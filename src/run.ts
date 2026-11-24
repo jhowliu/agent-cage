@@ -19,7 +19,11 @@ import {
 } from "./docker.js";
 import { ghTokenLookup, type GithubTokenLookup } from "./github-auth.js";
 import { fetchIssueContext } from "./issue.js";
-import { generateBranchName, type publishSuccessfulRun } from "./publish.js";
+import {
+  generateBranchName,
+  type CommandRunner,
+  type publishSuccessfulRun,
+} from "./publish.js";
 import { buildPromptContext } from "./prompt-context.js";
 import { fetchRevision } from "./pull-request.js";
 import { createAuthenticatedRepo, resolveTargetRepo } from "./repo.js";
@@ -60,6 +64,7 @@ export type ReviseCommandOptions = {
 };
 
 export type RunAgentCageDependencies = {
+  failureGh?: CommandRunner;
   fetchIssueContext?: typeof fetchIssueContext;
   fetchRevision?: typeof fetchRevision;
   resolveTargetRepo?: typeof resolveTargetRepo;
@@ -125,6 +130,9 @@ async function executeRun(
     return await runWorkflow({
       context,
       store,
+      ...(dependencies.failureGh === undefined
+        ? {}
+        : { failureGh: dependencies.failureGh }),
       ...(dependencies.createDockerSandbox === undefined
         ? {}
         : { createDockerSandbox: dependencies.createDockerSandbox }),

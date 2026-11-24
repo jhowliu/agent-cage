@@ -88,13 +88,6 @@ jobs:
       - name: Report failure
         if: failure()
         run: |
-          FAILURE_CODE=$(jq -r '.failureCode // "unknown"' "$RUNNER_TEMP/result.json" 2>/dev/null || echo unknown)
-          BODY="Agent Cage run failed (\`${FAILURE_CODE}\`). [View workflow run](${RUN_URL})."
-          SUMMARY_FILE=$(ls .agent-cage/runs/*/summary.md 2>/dev/null | head -n1 || true)
-          if [ -n "$SUMMARY_FILE" ]; then
-            BODY="${BODY}"$'\n\n'"$(cat "$SUMMARY_FILE")"
-          fi
-          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$BODY"
           gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
             --add-label 'agent-cage:blocked'
 

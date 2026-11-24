@@ -139,15 +139,7 @@ export function generateGitHubActionsWorkflow(input: GitHubActionsWorkflowInput)
         name: "Report failure",
         if: "failure()",
         env: managementEnv,
-        run: [
-          'FAILURE_CODE=$(jq -r \'.failureCode // "unknown"\' "$RESULT_JSON" 2>/dev/null || printf unknown)',
-          'BODY="Agent Cage failed (\\`${FAILURE_CODE}\\`). [View result](${RUN_URL})."',
-          "RUN_ID=$(jq -r '.runId // empty' \"$RESULT_JSON\" 2>/dev/null || true)",
-          'SUMMARY_FILE=".agent-cage/runs/${RUN_ID}/summary.md"',
-          'if [ -n "$RUN_ID" ] && [ -f "$SUMMARY_FILE" ]; then BODY="${BODY}"$\'\\n\\n\'"$(cat "$SUMMARY_FILE")"; fi',
-          'gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$BODY"',
-          labelCommand(labels, labels.blocked),
-        ].join("\n"),
+        run: [labelCommand(labels, labels.blocked)].join("\n"),
       },
       {
         name: "Upload run artifacts",
