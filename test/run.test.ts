@@ -1738,7 +1738,10 @@ verify:
 
     assert.equal(result.status, "succeeded");
     assert.equal(reviewSummary, undefined);
-    assert.ok(!shell.commands.some((command) => command.includes("git write-tree")));
+    assert.ok(
+      !shell.commands.includes("git add --all && git write-tree"),
+      "no red-green workspace snapshot is taken",
+    );
     assert.equal(
       shell.commands.filter((command) => command.includes("codex exec")).length,
       1,
@@ -2305,6 +2308,10 @@ agent:
   let agentCalls = 0;
   const shell: ShellRunner = {
     async run(command, options) {
+      if (command.includes("evidence_commit=$(")) {
+        assert.ok(options?.input?.includes("shots/home.png\n"));
+        return commandResult("a".repeat(40));
+      }
       if (command.includes("git clone") || command.includes("git fetch origin")) {
         return commandResult();
       }
@@ -2345,7 +2352,7 @@ agent:
           branchName: input.branchName ?? "agent-cage/reports",
           commitMessage: "reports",
           prTitle: "reports",
-          prBody: "body",
+          prBody: formatPrBody({ issue, metadata: input.metadata }),
           prUrl: "https://github.com/jhowliu/agent-cage/pull/107",
         }),
       },
@@ -2353,6 +2360,16 @@ agent:
 
     assert.equal(result.status, "succeeded");
     assert.equal(agentCalls, 2);
+    const published = JSON.parse(
+      await readFile(join(cwd, ".agent-cage", "runs", "run-reports", "pr.json"), "utf8"),
+    );
+    assert.match(published.prBody, /## Evidence/);
+    assert.ok(
+      published.prBody.includes(
+        `![shots/home.png](https://github.com/jhowliu/agent-cage/blob/${"a".repeat(40)}/shots/home.png?raw=true)`,
+      ),
+    );
+    assert.ok(published.prBody.includes(`/blob/${"a".repeat(40)}/verify.log?raw=true`));
     const runDir = join(cwd, ".agent-cage", "runs", "run-reports");
     const artifact = async (name: string): Promise<string> =>
       await readFile(join(runDir, name), "utf8");

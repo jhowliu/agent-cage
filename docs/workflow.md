@@ -249,6 +249,10 @@ Limits:
 
 Only regular files are copied: symlinks and special files are skipped. A file over 10 MB, files past 25 MB in total, and files past the first 200 are skipped too. The manifest lists each skipped file and why. A file matching several kinds is kept once, as the first of `junit`, `lcov`, `evidence`.
 
+After review passes, Agent Cage publishes the final verify's host run-directory copies and `verify.log` to `agent-cage/evidence/<run-id>` in the target repository. This is a single commit with no parent and does not change the working branch or index. It uses the same token that pushes the PR branch, which needs `contents: write`. The 10 MB per-file and 25 MB total limits also apply when publishing. The generated `README.md` lists files, sizes, kinds and skipped files with reasons, with images inline.
+
+The PR's Evidence section embeds up to six images using immutable commit SHA URLs and links other reports, the verify output and the evidence branch's README. Even without `reports` configured, it publishes `verify.log` and `README.md`. Revision runs publish their own evidence branch and include the section in the revision comment. A publishing failure leaves the run running, records the reason in the publish log and shows “Evidence could not be published” in the section.
+
 ### Test results
 
 When `reports.junit` collected files, Agent Cage reads their redacted copies in the run directory (never the sandbox files) and parses them as JUnit XML. A `<testsuites>` root, a single `<testsuite>` root and nested suites are accepted. It counts `<testcase>` elements, not suite attributes: a testcase with `<failure>` or `<error>` is failed, with `<skipped>` is skipped, and any other is passed.
