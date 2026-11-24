@@ -1,3 +1,4 @@
+import { formatEvidenceSection, type EvidenceResult } from "./run/evidence.js";
 import { execa } from "execa";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -30,6 +31,7 @@ export type PublishMetadata = {
   // The review agent's description of the change; null falls back to a one-line summary.
   description: string | null;
   verification: string[];
+  evidence?: EvidenceResult;
   reviewStatus: string;
   risks: string[];
 };
@@ -234,6 +236,9 @@ export async function publishRevision(
         runId: input.metadata.runId,
         commit,
         verification: input.metadata.verification,
+        ...(input.metadata.evidence === undefined
+          ? {}
+          : { evidence: input.metadata.evidence }),
       })}`,
       "--silent",
     ],
@@ -255,6 +260,7 @@ export function formatRevisionComment(input: {
   runId: string;
   commit: string;
   verification: string[];
+  evidence?: EvidenceResult;
 }): string {
   const feedback = input.revision.feedback
     .map((item) => `- ${describeFeedback(item)}`)
@@ -272,7 +278,7 @@ ${feedback}
 
 Verification:
 ${verification}
-
+${formatEvidenceSection(input.evidence)}
 Review threads stay unresolved. Resolve the ones this commit settles; the next revise reads every unresolved thread again.
 `;
 }
@@ -349,7 +355,7 @@ export function formatPrBody(input: {
 
 ## Verification
 ${verification}
-
+${formatEvidenceSection(input.metadata.evidence)}
 ## Review
 ${input.metadata.reviewStatus}
 

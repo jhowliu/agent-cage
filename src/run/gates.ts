@@ -1,3 +1,4 @@
+import { publishEvidence } from "./evidence.js";
 import {
   assertNoGuardViolations,
   guardAttemptDecision,
@@ -48,6 +49,7 @@ export type VerificationResult =
 type RunGatePhaseBody = () => Promise<string | undefined>;
 
 export type RunGateJournal = {
+  artifactPath?: (name: string) => string;
   setRunStatus: (status: RunStatus) => Promise<void>;
   runPhase: <TValue = undefined>(
     name: PhaseName,
@@ -198,6 +200,21 @@ export async function runPublishGate(input: {
     let result;
     const publishCredentials = input.context.credentials.command("publish");
 
+    const artifactPath = input.journal.artifactPath?.bind(input.journal);
+    const evidence =
+      artifactPath === undefined
+        ? undefined
+        : await publishEvidence({
+            shell: input.shell,
+            options: publishCredentials,
+            runId: input.context.runId,
+            repo: input.context.repoResolution.repo.fullName,
+            issueUrl: input.context.issue.url,
+            artifactPath,
+            reports: input.verification.reports,
+            authorName: input.context.config.git.author_name,
+            authorEmail: input.context.config.git.author_email,
+          });
     const shared = {
       cwd: input.context.cwd,
       issue: input.context.issue,
@@ -210,6 +227,7 @@ export async function runPublishGate(input: {
         verification: input.verification.items,
         reviewStatus: "Independent review passed.",
         risks: [],
+        ...(evidence === undefined ? {} : { evidence }),
       },
       git: createGitCommandRunner(input.shell, publishCredentials),
       gh: createGhCommandRunner(input.shell, publishCredentials),
@@ -236,7 +254,7 @@ export async function runPublishGate(input: {
     }
 
     return {
-      log: input.redactor(JSON.stringify(result, null, 2)),
+      log: input.redactor(JSON.stringify({ ...result, evidence }, null, 2)),
       value: result,
     };
   });
