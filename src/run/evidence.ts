@@ -49,11 +49,15 @@ export function formatEvidenceReadme(input: {
       .filter((file) => imagePattern.test(file.path))
       .map((file) => `![${label(file.path)}](./${urlPath(file.path)})`),
     "",
-    "## Skipped files",
-    "",
-    ...input.skipped.map(
-      (file) => `- ${label(file.path)} (${file.kind}): ${file.reason}`,
-    ),
+    ...(input.skipped.length > 0
+      ? [
+          "## Skipped files",
+          "",
+          ...input.skipped.map(
+            (file) => `- ${label(file.path)} (${file.kind}): ${file.reason}`,
+          ),
+        ]
+      : []),
     "",
   ].join("\n");
 }
