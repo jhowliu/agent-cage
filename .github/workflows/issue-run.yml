@@ -1,10 +1,13 @@
 name: Agent Cage issue run
 
 # Label an issue with `agent-cage:run` to have Agent Cage implement it and open
-# a PR. Requires these labels to exist and two secrets (see docs/workflow.md):
+# a PR. Requires these labels to exist and these secrets (see docs/workflow.md):
 #   - AGENT_CAGE_GITHUB_TOKEN: a PAT or GitHub App token (NOT the default
 #     GITHUB_TOKEN, whose events do not trigger downstream workflows).
-#   - OPENAI_API_KEY: Codex auth for direct-mode runs.
+#   - CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`) or ANTHROPIC_API_KEY:
+#     Claude Code auth for the implementation agent.
+#   - OPENAI_API_KEY: Codex auth for the review agent.
+# The agents are set in .agent-cage.yml; change these secrets with them.
 on:
   issues:
     types: [labeled]
@@ -19,6 +22,7 @@ permissions:
 
 env:
   CODEX_CLI_VERSION: "0.167.0"
+  CLAUDE_CODE_VERSION: "2.1.319"
 
 jobs:
   run:
@@ -50,14 +54,26 @@ jobs:
           npm ci
           npm run build
 
-      - name: Install Codex CLI
-        run: npm install -g "@openai/codex@${CODEX_CLI_VERSION}"
+      - name: Install agent CLIs
+        run: |
+          npm install -g "@openai/codex@${CODEX_CLI_VERSION}" \
+            "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
 
       - name: Write Agent Cage credentials
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AGENT_CAGE_GITHUB_TOKEN: ${{ secrets.AGENT_CAGE_GITHUB_TOKEN }}
         run: |
+          { test -n "$CLAUDE_CODE_OAUTH_TOKEN" || test -n "$ANTHROPIC_API_KEY"; } || { printf "Missing CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY\n" >&2; exit 1; }
+          test -n "$OPENAI_API_KEY" || { printf "Missing OPENAI_API_KEY\n" >&2; exit 1; }
+          umask 077
           {
-            printf 'OPENAI_API_KEY=%s\n' "${{ secrets.OPENAI_API_KEY }}"
-            printf 'GITHUB_TOKEN=%s\n' "${{ secrets.AGENT_CAGE_GITHUB_TOKEN }}"
+            if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then printf 'CLAUDE_CODE_OAUTH_TOKEN=%s\n' "$CLAUDE_CODE_OAUTH_TOKEN"; fi
+            if [ -n "$ANTHROPIC_API_KEY" ]; then printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY"; fi
+            printf 'OPENAI_API_KEY=%s\n' "$OPENAI_API_KEY"
+            printf 'GITHUB_TOKEN=%s\n' "$AGENT_CAGE_GITHUB_TOKEN"
           } > .agent-cage.env
 
       - name: Run Agent Cage
