@@ -249,6 +249,16 @@ Limits:
 
 Only regular files are copied: symlinks and special files are skipped. A file over 10 MB, files past 25 MB in total, and files past the first 200 are skipped too. The manifest lists each skipped file and why. A file matching several kinds is kept once, as the first of `junit`, `lcov`, `evidence`.
 
+### Test results
+
+When `reports.junit` collected files, Agent Cage reads their redacted copies in the run directory (never the sandbox files) and parses them as JUnit XML. A `<testsuites>` root, a single `<testsuite>` root and nested suites are accepted. It counts `<testcase>` elements, not suite attributes: a testcase with `<failure>` or `<error>` is failed, with `<skipped>` is skipped, and any other is passed.
+
+- **PR body and revision comment**: the Verification list gets one item after the command items, such as `Tests: 42 passed, 0 failed, 1 skipped (JUnit: reports/junit.xml)`. With several files the counts are summed and each file is named. A file that does not parse gives `Tests: could not read reports/junit.xml` and never fails the run.
+- **Retry feedback**: when a verify command fails and that verify collected JUnit files with failed testcases, the feedback lists up to 20 of them first, as `<classname> > <name>: <first line of the failure message>`, then the usual command output.
+- Without `reports.junit`, or when no file was collected, there is no item and the feedback does not change.
+
+`agent-cage setup` offers to add the JUnit reporter when it detects node:test, Vitest or pytest, and Jest only when `jest-junit` is already a dependency. It never adds a dependency. Accepting rewrites the verify command and sets `reports.junit: ["reports/junit.xml"]`, keeping the runner's normal output on stdout. For example `mkdir -p reports && npm test -- --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=reports/junit.xml`. A package script such as `npm test` gets the flags after `--` only when the script runs the runner directly; a script that chains commands gets no offer. Interactive setup asks; `--yes` adds it only to a new config.
+
 Point each tool's output at the paths you list, for example `vitest run --reporter=junit --outputFile=reports/junit.xml` or Playwright's default `test-results/`.
 
 ## Doctor

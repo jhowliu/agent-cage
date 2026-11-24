@@ -29,7 +29,25 @@ export type ProjectDetection = {
   toolchains: ProjectToolchain[];
   // How to run one test file, when the test runner is known.
   redGreen: RedGreenConfig | null;
+  // How to make the test runner write JUnit XML, when it is known and safe.
+  junit: JunitOffer | null;
 };
+
+export const junitRunners = ["node:test", "vitest", "jest", "pytest"] as const;
+export type JunitRunner = (typeof junitRunners)[number];
+
+/** Rewrites one detected verify command so the runner also writes JUnit XML. */
+export type JunitOffer = {
+  runner: JunitRunner;
+  /** The detected verify command to rewrite. */
+  command: string;
+  /** The command with the reporter flags and the output directory. */
+  replacement: string;
+  /** The `reports.junit` glob the runner writes to. */
+  glob: string;
+};
+
+const junitFile = "reports/junit.xml";
 
 /** Read-only view of the repo root, so detection can be tested without a disk. */
 export type ProjectFiles = {
@@ -43,6 +61,7 @@ type EcosystemDetection = {
   verify: string[];
   toolchains: ProjectToolchain[];
   redGreen?: RedGreenConfig | null;
+  junit?: JunitOffer | null;
 };
 
 export function projectFilesAt(cwd: string): ProjectFiles {
@@ -90,6 +109,7 @@ export async function detectProject(files: ProjectFiles): Promise<ProjectDetecti
     toolchains: projectToolchains.filter((toolchain) => toolchains.has(toolchain)),
     redGreen:
       detections.find((detection) => detection.redGreen != null)?.redGreen ?? null,
+    junit: detections.find((detection) => detection.junit != null)?.junit ?? null,
   };
 }
 
@@ -105,7 +125,52 @@ async function detectNode(files: ProjectFiles): Promise<EcosystemDetection | nul
     verify: nodeVerifyCommands(manager.run, packageJson.scripts),
     toolchains: manager.toolchains,
     redGreen: nodeRedGreen(manager.run, packageJson),
+    junit: nodeJunit(manager.run, packageJson),
   };
+}
+
+/**
+ * Adds the runner's JUnit reporter to `<manager> test` when the test script
+ * runs the runner directly. A script that chains other commands, or wraps the
+ * runner, gets no offer, since extra flags would reach the wrong command.
+ */
+function nodeJunit(
+  runPrefix: string,
+  packageJson: { scripts: Record<string, string>; dependencies: string[] },
+): JunitOffer | null {
+  const testScript = packageJson.scripts.test?.trim();
+  if (testScript === undefined || /[&|;<>`$()]/.test(testScript)) return null;
+  const command = runPrefix === "npm run" ? "npm test" : `${runPrefix} test`;
+  // npm and pnpm 8 need `--` to forward flags to the script.
+  const forward = runPrefix === "yarn" ? command : `${command} --`;
+  const mkdir = "mkdir -p reports";
+  const offer = (runner: JunitRunner, replacement: string): JunitOffer => ({
+    runner,
+    command,
+    replacement,
+    glob: junitFile,
+  });
+
+  if (/^node\s+--test\b/.test(testScript)) {
+    return offer(
+      "node:test",
+      `${mkdir} && ${forward} --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=${junitFile}`,
+    );
+  }
+  if (/^vitest\b/.test(testScript)) {
+    return offer(
+      "vitest",
+      `${mkdir} && ${forward} --reporter=default --reporter=junit --outputFile.junit=${junitFile}`,
+    );
+  }
+  // Jest writes JUnit XML only through jest-junit, which setup never installs.
+  if (/^jest\b/.test(testScript) && packageJson.dependencies.includes("jest-junit")) {
+    return offer(
+      "jest",
+      `${mkdir} && JEST_JUNIT_OUTPUT_FILE=${junitFile} ${forward} --reporters=default --reporters=jest-junit`,
+    );
+  }
+  return null;
 }
 
 const jsTestFiles = ["**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs,mts,cts}"];
@@ -254,6 +319,12 @@ function pythonDetection(
       test_files: ["**/test_*.py", "**/*_test.py"],
       support_files: ["**/conftest.py"],
       run: `${pytest} {file}`,
+    },
+    junit: {
+      runner: "pytest",
+      command: pytest,
+      replacement: `mkdir -p reports && ${pytest} --junitxml=${junitFile}`,
+      glob: junitFile,
     },
   };
 }

@@ -100,6 +100,7 @@ test("setup detects commands and enables both local Docker and Actions", async (
     const config = parse(await readFile(join(cwd, ".agent-cage.yml"), "utf8")) as {
       setup: string[];
       verify: string[];
+      reports: { junit: string[] };
       execution: string;
       actions: { enabled: boolean; agent_cage_version: string };
     };
@@ -114,7 +115,8 @@ test("setup detects commands and enables both local Docker and Actions", async (
     const envExample = await readFile(join(cwd, ".agent-cage.env.example"), "utf8");
 
     assert.deepEqual(config.setup, ["npm ci"]);
-    assert.deepEqual(config.verify, ["npm test"]);
+    assert.match(config.verify[0] ?? "", /^mkdir -p reports && npm test -- .*junit/);
+    assert.deepEqual(config.reports.junit, ["reports/junit.xml"]);
     assert.equal(config.execution, "docker");
     assert.equal(config.actions.enabled, true);
     assert.equal(config.actions.agent_cage_version, "0.1.0");
@@ -724,5 +726,123 @@ test("setup keeps the API default Codex model when OPENAI_API_KEY is set", async
   } finally {
     await rm(globalEnvPath, { force: true });
     await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+type JunitConfig = { verify?: string[]; reports?: { junit?: string[] } };
+
+async function nodeRepo(
+  scripts: Record<string, string>,
+  devDependencies: Record<string, string> = {},
+): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), "agent-cage-setup-"));
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({ scripts, devDependencies }),
+    "utf8",
+  );
+  await writeFile(join(cwd, "package-lock.json"), "{}\n", "utf8");
+  return cwd;
+}
+
+async function readJunitConfig(cwd: string): Promise<JunitConfig> {
+  return parse(await readFile(join(cwd, ".agent-cage.yml"), "utf8")) as JunitConfig;
+}
+
+function recordingPrompts(asked: string[], answer = true): SetupPrompts {
+  return {
+    ...acceptingPrompts(),
+    async confirm(message, defaultValue) {
+      if (message.startsWith("Show test results")) {
+        asked.push(message);
+        return answer;
+      }
+      return await acceptingPrompts().confirm(message, defaultValue);
+    },
+  };
+}
+
+for (const [runner, script, flags] of [
+  ["node:test", "node --test", "--test-reporter=junit"],
+  ["vitest", "vitest run", "--reporter=junit"],
+] as const) {
+  test(`setup offers the ${runner} JUnit reporter and writes verify and reports.junit`, async () => {
+    const cwd = await nodeRepo({ test: script });
+    try {
+      const asked: string[] = [];
+      await setup(cwd, {}, recordingPrompts(asked));
+      const config = await readJunitConfig(cwd);
+
+      assert.equal(asked.length, 1);
+      assert.match(config.verify?.[0] ?? "", /^mkdir -p reports && npm test -- /);
+      assert.ok(config.verify?.[0]?.includes(flags));
+      assert.deepEqual(config.reports?.junit, ["reports/junit.xml"]);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+}
+
+test("declining the JUnit offer leaves verify and reports alone", async () => {
+  const cwd = await nodeRepo({ test: "node --test" });
+  try {
+    await setup(cwd, {}, recordingPrompts([], false));
+    const config = await readJunitConfig(cwd);
+
+    assert.deepEqual(config.verify, ["npm test"]);
+    assert.equal(config.reports, undefined);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("setup --yes adds JUnit only to a new config", async () => {
+  const cwd = await nodeRepo({ test: "node --test" });
+  try {
+    await setup(cwd, { yes: true, actions: false });
+    assert.deepEqual((await readJunitConfig(cwd)).reports?.junit, ["reports/junit.xml"]);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+
+  const existing = await nodeRepo({ test: "node --test" });
+  try {
+    await writeFile(
+      join(existing, ".agent-cage.yml"),
+      "setup:\n  - npm ci\nverify:\n  - npm test\n",
+      "utf8",
+    );
+    await setup(existing, { yes: true, actions: false });
+    const config = await readJunitConfig(existing);
+
+    assert.deepEqual(config.verify, ["npm test"]);
+    assert.equal(config.reports, undefined);
+  } finally {
+    await rm(existing, { recursive: true, force: true });
+  }
+});
+
+test("setup offers Jest JUnit only when jest-junit is a dependency", async () => {
+  const without = await nodeRepo({ test: "jest" }, { jest: "^29.0.0" });
+  try {
+    const asked: string[] = [];
+    await setup(without, {}, recordingPrompts(asked));
+    await setup(without, { yes: true, actions: false });
+
+    assert.deepEqual(asked, []);
+    assert.equal((await readJunitConfig(without)).reports, undefined);
+  } finally {
+    await rm(without, { recursive: true, force: true });
+  }
+
+  const withReporter = await nodeRepo(
+    { test: "jest" },
+    { jest: "^29.0.0", "jest-junit": "^16.0.0" },
+  );
+  try {
+    await setup(withReporter, {}, recordingPrompts([]));
+    assert.match((await readJunitConfig(withReporter)).verify?.[0] ?? "", /jest-junit/);
+  } finally {
+    await rm(withReporter, { recursive: true, force: true });
   }
 });

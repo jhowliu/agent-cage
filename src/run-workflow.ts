@@ -46,6 +46,7 @@ import {
   prepareReportPaths,
   type ReportCollection,
 } from "./run/reports.js";
+import { formatJunitFailures, formatJunitItems, readJunitReports } from "./run/junit.js";
 import {
   buildImplementationPrompt,
   buildTestFirstPrompt,
@@ -994,9 +995,16 @@ async function runVerificationCommands(input: {
       }
       await phase.fail(input.redactor(logs.join("\n")));
       await recordCommands("failed");
+      const junit = await readJunitReports(
+        (name) => input.journal.artifactPath(name),
+        collection,
+      );
+      const failedTests = formatJunitFailures(junit);
       return {
         passed: false,
-        feedback: `Verification failed for command: ${input.redactor(command)}\n${commandLog}`,
+        feedback: `Verification failed for command: ${input.redactor(command)}\n${
+          failedTests === null ? "" : `${input.redactor(failedTests)}\n\n`
+        }${commandLog}`,
         reports: collection,
       };
     }
@@ -1016,6 +1024,12 @@ async function runVerificationCommands(input: {
   const summary = input.redactor(logs.join("\n"));
   await phase.pass(summary);
   await recordCommands("passed");
+
+  const junit = await readJunitReports(
+    (name) => input.journal.artifactPath(name),
+    collection,
+  );
+  items.push(...formatJunitItems(junit).map((item) => input.redactor(item)));
 
   return {
     passed: true,
