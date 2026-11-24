@@ -542,9 +542,12 @@ npm run qa:image
 ```bash
 agent-cage cleanup
 agent-cage cleanup --all
+agent-cage cleanup --evidence [--repo owner/name] [--yes]
 ```
 
 Default cleanup removes stopped managed containers plus networks and volumes for runs without active managed containers. `--all` explicitly removes active managed containers and all managed networks and volumes.
+
+`--evidence` also cleans up remote `agent-cage/evidence/` branches after Docker cleanup. It uses the current directory’s `origin` repository, or `--repo owner/name`. Branches linked in PR bodies are deleted only when all linked PRs are merged or closed. Unlinked branches are deleted when their commit is older than 14 days. Cleanup lists candidates and reasons before asking for confirmation. `--yes` skips confirmation; without a TTY or `--yes`, it lists candidates and deletes nothing.
 
 Cleanup does not delete `.agent-cage/runs` artifacts or `.agent-cage/agent-cage.sqlite`.
 
