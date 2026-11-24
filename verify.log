@@ -1,0 +1,2319 @@
+$ npm test
+exit code: 0
+stdout:
+
+> agent-cage@0.1.0 test
+> npm run build && node --test "dist/test/**/*.test.js"
+
+
+> agent-cage@0.1.0 build
+> tsc -p tsconfig.json
+
+TAP version 13
+# Subtest: Claude implementation runs headless with permissions bypassed and streaming output
+ok 1 - Claude implementation runs headless with permissions bypassed and streaming output
+  ---
+  duration_ms: 0.616083
+  type: 'test'
+  ...
+# Subtest: Claude review is limited to read-only tools and a JSON schema
+ok 2 - Claude review is limited to read-only tools and a JSON schema
+  ---
+  duration_ms: 0.155416
+  type: 'test'
+  ...
+# Subtest: Codex commands keep the sandbox flag in Docker mode and bypass it in direct mode
+ok 3 - Codex commands keep the sandbox flag in Docker mode and bypass it in direct mode
+  ---
+  duration_ms: 0.1435
+  type: 'test'
+  ...
+# Subtest: Codex review writes the output schema before running read-only
+ok 4 - Codex review writes the output schema before running read-only
+  ---
+  duration_ms: 0.096917
+  type: 'test'
+  ...
+# Subtest: agent commands take the prompt on stdin, never as an argument
+ok 5 - agent commands take the prompt on stdin, never as an argument
+  ---
+  duration_ms: 0.13675
+  type: 'test'
+  ...
+# Subtest: extractClaudeResult prefers structured output over result text
+ok 6 - extractClaudeResult prefers structured output over result text
+  ---
+  duration_ms: 1.02275
+  type: 'test'
+  ...
+# Subtest: extractClaudeResult falls back to result text
+ok 7 - extractClaudeResult falls back to result text
+  ---
+  duration_ms: 0.138959
+  type: 'test'
+  ...
+# Subtest: extractClaudeResult rejects error results and missing result events
+ok 8 - extractClaudeResult rejects error results and missing result events
+  ---
+  duration_ms: 0.261958
+  type: 'test'
+  ...
+# Subtest: extractAgentResult passes Codex output through unchanged
+ok 9 - extractAgentResult passes Codex output through unchanged
+  ---
+  duration_ms: 0.310167
+  type: 'test'
+  ...
+# Subtest: claudeFailureCode recognizes rejected credentials and unknown models
+ok 10 - claudeFailureCode recognizes rejected credentials and unknown models
+  ---
+  duration_ms: 0.654667
+  type: 'test'
+  ...
+# Subtest: codexFailureCode reads only the final ERROR lines
+ok 11 - codexFailureCode reads only the final ERROR lines
+  ---
+  duration_ms: 0.236291
+  type: 'test'
+  ...
+# Subtest: agentFailureCode reads Claude stdout and Codex stderr
+ok 12 - agentFailureCode reads Claude stdout and Codex stderr
+  ---
+  duration_ms: 0.101292
+  type: 'test'
+  ...
+# Subtest: codexConfigModel reads the top-level model only
+ok 13 - codexConfigModel reads the top-level model only
+  ---
+  duration_ms: 0.109333
+  type: 'test'
+  ...
+# Subtest: checkIssue reports a missing config without fetching the issue
+ok 14 - checkIssue reports a missing config without fetching the issue
+  ---
+  duration_ms: 41.608542
+  type: 'test'
+  ...
+# Subtest: checkIssue is not ready while a blocker is open and lists template warnings
+ok 15 - checkIssue is not ready while a blocker is open and lists template warnings
+  ---
+  duration_ms: 10.027041
+  type: 'test'
+  ...
+# Subtest: checkIssue is ready when every blocker is closed
+ok 16 - checkIssue is ready when every blocker is closed
+  ---
+  duration_ms: 5.470833
+  type: 'test'
+  ...
+# Subtest: root help lists commands
+ok 17 - root help lists commands
+  ---
+  duration_ms: 385.907083
+  type: 'test'
+  ...
+# Subtest: command help is available for commands
+ok 18 - command help is available for commands
+  ---
+  duration_ms: 1404.374959
+  type: 'test'
+  ...
+# Subtest: run accepts a positional issue URL
+ok 19 - run accepts a positional issue URL
+  ---
+  duration_ms: 2.957875
+  type: 'test'
+  ...
+# Subtest: revise passes the PR URL and feedback and writes the result file
+ok 20 - revise passes the PR URL and feedback and writes the result file
+  ---
+  duration_ms: 14.802042
+  type: 'test'
+  ...
+# Subtest: run writes the result file and exits zero on success
+ok 21 - run writes the result file and exits zero on success
+  ---
+  duration_ms: 3.219125
+  type: 'test'
+  ...
+# Subtest: run writes the result file and exits non-zero on failure
+ok 22 - run writes the result file and exits non-zero on failure
+  ---
+  duration_ms: 4.503417
+  type: 'test'
+  ...
+# Subtest: run reads the result file path from the environment
+ok 23 - run reads the result file path from the environment
+  ---
+  duration_ms: 3.338709
+  type: 'test'
+  ...
+# Run: unstarted
+# Status: failed
+# Failure: missing_config
+# Subtest: run writes a result file for preflight failures
+ok 24 - run writes a result file for preflight failures
+  ---
+  duration_ms: 3.619416
+  type: 'test'
+  ...
+# (node:55) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: runs list and show read local run metadata
+ok 25 - runs list and show read local run metadata
+  ---
+  duration_ms: 309.894084
+  type: 'test'
+  ...
+# Subtest: runs show can emit color when forced
+ok 26 - runs show can emit color when forced
+  ---
+  duration_ms: 138.2195
+  type: 'test'
+  ...
+# Subtest: runs list --json prints each run newest first with whether it was interrupted
+ok 27 - runs list --json prints each run newest first with whether it was interrupted
+  ---
+  duration_ms: 250.252501
+  type: 'test'
+  ...
+# Subtest: runs list --json in a repository without runs prints an empty list
+ok 28 - runs list --json in a repository without runs prints an empty list
+  ---
+  duration_ms: 120.626083
+  type: 'test'
+  ...
+# Subtest: runs list in a repository without runs creates no state and prints no warnings
+ok 29 - runs list in a repository without runs creates no state and prints no warnings
+  ---
+  duration_ms: 114.348708
+  type: 'test'
+  ...
+# Subtest: composeProjectName creates stable per-run project names
+ok 30 - composeProjectName creates stable per-run project names
+  ---
+  duration_ms: 2.685125
+  type: 'test'
+  ...
+# Subtest: composeBaseArgs scopes compose to project name and project directory
+ok 31 - composeBaseArgs scopes compose to project name and project directory
+  ---
+  duration_ms: 1.215917
+  type: 'test'
+  ...
+# Subtest: hasComposeServices reports whether compose is configured
+ok 32 - hasComposeServices reports whether compose is configured
+  ---
+  duration_ms: 0.079291
+  type: 'test'
+  ...
+# Subtest: compose project starts and tears down services with volumes
+ok 33 - compose project starts and tears down services with volumes
+  ---
+  duration_ms: 0.59225
+  type: 'test'
+  ...
+# Subtest: compose readiness commands run on compose network without Docker socket or host ports
+ok 34 - compose readiness commands run on compose network without Docker socket or host ports
+  ---
+  duration_ms: 0.482125
+  type: 'test'
+  ...
+# Subtest: readyCommandRunArgs is explicit about the no-workspace readiness container
+ok 35 - readyCommandRunArgs is explicit about the no-workspace readiness container
+  ---
+  duration_ms: 0.213208
+  type: 'test'
+  ...
+# Subtest: load reports a missing optional config
+ok 36 - load reports a missing optional config
+  ---
+  duration_ms: 12.886166
+  type: 'test'
+  ...
+# Subtest: load returns the YAML document and parsed valid config
+ok 37 - load returns the YAML document and parsed valid config
+  ---
+  duration_ms: 23.903958
+  type: 'test'
+  ...
+# Subtest: load distinguishes YAML and config validation failures
+ok 38 - load distinguishes YAML and config validation failures
+  ---
+  duration_ms: 8.664542
+  type: 'test'
+  ...
+# Subtest: update changes only supplied managed keys and preserves comments and unknown keys
+ok 39 - update changes only supplied managed keys and preserves comments and unknown keys
+  ---
+  duration_ms: 34.9365
+  type: 'test'
+  ...
+# Subtest: update validates before creating a missing config
+ok 40 - update validates before creating a missing config
+  ---
+  duration_ms: 2.58875
+  type: 'test'
+  ...
+# Subtest: config schema accepts a minimal valid config
+ok 41 - config schema accepts a minimal valid config
+  ---
+  duration_ms: 9.313583
+  type: 'test'
+  ...
+# Subtest: config schema rejects empty verify commands
+ok 42 - config schema rejects empty verify commands
+  ---
+  duration_ms: 0.555375
+  type: 'test'
+  ...
+# Subtest: config schema leaves test-first runs (red-green) off unless configured
+ok 43 - config schema leaves test-first runs (red-green) off unless configured
+  ---
+  duration_ms: 1.30225
+  type: 'test'
+  ...
+# Subtest: config schema requires red_green.run to name the test file
+ok 44 - config schema requires red_green.run to name the test file
+  ---
+  duration_ms: 0.315958
+  type: 'test'
+  ...
+# Subtest: config schema accepts explicit runtime image and Dockerfile
+ok 45 - config schema accepts explicit runtime image and Dockerfile
+  ---
+  duration_ms: 0.268583
+  type: 'test'
+  ...
+# Subtest: config schema preserves unknown keys for forward compatibility
+ok 46 - config schema preserves unknown keys for forward compatibility
+  ---
+  duration_ms: 0.230375
+  type: 'test'
+  ...
+# Subtest: execution mode defaults to docker
+ok 47 - execution mode defaults to docker
+  ---
+  duration_ms: 0.086292
+  type: 'test'
+  ...
+# Subtest: execution mode reads from config when no env override
+ok 48 - execution mode reads from config when no env override
+  ---
+  duration_ms: 0.059917
+  type: 'test'
+  ...
+# Subtest: execution mode env overrides config
+ok 49 - execution mode env overrides config
+  ---
+  duration_ms: 0.258125
+  type: 'test'
+  ...
+# Subtest: execution mode ignores empty env value and falls back
+ok 50 - execution mode ignores empty env value and falls back
+  ---
+  duration_ms: 0.292875
+  type: 'test'
+  ...
+# Subtest: execution mode rejects an invalid env value
+ok 51 - execution mode rejects an invalid env value
+  ---
+  duration_ms: 0.270292
+  type: 'test'
+  ...
+# Subtest: config schema accepts an explicit execution mode
+ok 52 - config schema accepts an explicit execution mode
+  ---
+  duration_ms: 0.298875
+  type: 'test'
+  ...
+# Subtest: config schema accepts GitHub Actions settings
+ok 53 - config schema accepts GitHub Actions settings
+  ---
+  duration_ms: 0.844583
+  type: 'test'
+  ...
+# Subtest: config schema requires a pinned version when Actions is enabled
+ok 54 - config schema requires a pinned version when Actions is enabled
+  ---
+  duration_ms: 0.202
+  type: 'test'
+  ...
+# Subtest: agents default to Codex for both roles
+ok 55 - agents default to Codex for both roles
+  ---
+  duration_ms: 0.082459
+  type: 'test'
+  ...
+# Subtest: legacy agent.model applies to every Codex role
+ok 56 - legacy agent.model applies to every Codex role
+  ---
+  duration_ms: 0.152458
+  type: 'test'
+  ...
+# Subtest: agent roles pick a provider default model unless one is configured
+ok 57 - agent roles pick a provider default model unless one is configured
+  ---
+  duration_ms: 0.24475
+  type: 'test'
+  ...
+# Subtest: resolved agent config round-trips through the schema
+ok 58 - resolved agent config round-trips through the schema
+  ---
+  duration_ms: 0.094833
+  type: 'test'
+  ...
+# Subtest: config schema rejects unknown agent providers
+ok 59 - config schema rejects unknown agent providers
+  ---
+  duration_ms: 0.169041
+  type: 'test'
+  ...
+# Subtest: normalizeCredentialEnv drops empty placeholders and mirrors GITHUB_TOKEN to GH_TOKEN
+ok 60 - normalizeCredentialEnv drops empty placeholders and mirrors GITHUB_TOKEN to GH_TOKEN
+  ---
+  duration_ms: 2.42325
+  type: 'test'
+  ...
+# Subtest: setup and verify receive non-credential env only
+ok 61 - setup and verify receive non-credential env only
+  ---
+  duration_ms: 0.732792
+  type: 'test'
+  ...
+# Subtest: clone receives only GitHub auth
+ok 62 - clone receives only GitHub auth
+  ---
+  duration_ms: 0.356542
+  type: 'test'
+  ...
+# Subtest: implementation and review receive only Codex auth
+ok 63 - implementation and review receive only Codex auth
+  ---
+  duration_ms: 0.378791
+  type: 'test'
+  ...
+# Subtest: implementation and review use OAuth fallback only when OPENAI_API_KEY is absent
+ok 64 - implementation and review use OAuth fallback only when OPENAI_API_KEY is absent
+  ---
+  duration_ms: 0.325
+  type: 'test'
+  ...
+# Subtest: publish receives only GitHub auth
+ok 65 - publish receives only GitHub auth
+  ---
+  duration_ms: 0.357791
+  type: 'test'
+  ...
+# Subtest: prepareRunCredentials centralizes run-level credential policy
+ok 66 - prepareRunCredentials centralizes run-level credential policy
+  ---
+  duration_ms: 3.752708
+  type: 'test'
+  ...
+# Subtest: prepareRunCredentials skips OAuth lookup when OpenAI API key is present
+ok 67 - prepareRunCredentials skips OAuth lookup when OpenAI API key is present
+  ---
+  duration_ms: 0.139167
+  type: 'test'
+  ...
+# Subtest: each agent role receives only its own provider's credentials
+ok 68 - each agent role receives only its own provider's credentials
+  ---
+  duration_ms: 1.399375
+  type: 'test'
+  ...
+# Subtest: prepareRunCredentials skips the Codex OAuth lookup when no role uses Codex
+ok 69 - prepareRunCredentials skips the Codex OAuth lookup when no role uses Codex
+  ---
+  duration_ms: 4.9875
+  type: 'test'
+  ...
+# Subtest: mergeCredentialEnv layers repo values over the global agent credentials
+ok 70 - mergeCredentialEnv layers repo values over the global agent credentials
+  ---
+  duration_ms: 0.768791
+  type: 'test'
+  ...
+# Subtest: globalCredentialsPath follows XDG_CONFIG_HOME
+ok 71 - globalCredentialsPath follows XDG_CONFIG_HOME
+  ---
+  duration_ms: 0.174042
+  type: 'test'
+  ...
+# Subtest: prepareRunCredentials takes GITHUB_TOKEN from the pinned gh account
+ok 72 - prepareRunCredentials takes GITHUB_TOKEN from the pinned gh account
+  ---
+  duration_ms: 1.205208
+  type: 'test'
+  ...
+# Subtest: prepareRunCredentials uses the active gh account when none is pinned
+ok 73 - prepareRunCredentials uses the active gh account when none is pinned
+  ---
+  duration_ms: 0.385708
+  type: 'test'
+  ...
+# Subtest: prepareRunCredentials fails when the pinned gh account has no token
+ok 74 - prepareRunCredentials fails when the pinned gh account has no token
+  ---
+  duration_ms: 0.731125
+  type: 'test'
+  ...
+# Subtest: prepareRunCredentials rejects a gh account that is not a GitHub login
+ok 75 - prepareRunCredentials rejects a gh account that is not a GitHub login
+  ---
+  duration_ms: 0.400917
+  type: 'test'
+  ...
+# Subtest: dockerResourceNames creates stable Docker-safe resource names
+ok 76 - dockerResourceNames creates stable Docker-safe resource names
+  ---
+  duration_ms: 0.951917
+  type: 'test'
+  ...
+# Subtest: unauthenticatedRemoteUrl strips HTTPS credentials
+ok 77 - unauthenticatedRemoteUrl strips HTTPS credentials
+  ---
+  duration_ms: 0.190458
+  type: 'test'
+  ...
+# Subtest: volume and network resources carry managed labels
+ok 78 - volume and network resources carry managed labels
+  ---
+  duration_ms: 0.194792
+  type: 'test'
+  ...
+# Subtest: dockerRunArgs uses volume workspace and avoids host-sensitive mounts
+ok 79 - dockerRunArgs uses volume workspace and avoids host-sensitive mounts
+  ---
+  duration_ms: 0.791625
+  type: 'test'
+  ...
+# Subtest: dockerRunArgs wires GitHub auth through command-scoped askpass
+ok 80 - dockerRunArgs wires GitHub auth through command-scoped askpass
+  ---
+  duration_ms: 0.149708
+  type: 'test'
+  ...
+# Subtest: dockerRunArgs can mount only the Codex auth file for OAuth fallback
+ok 81 - dockerRunArgs can mount only the Codex auth file for OAuth fallback
+  ---
+  duration_ms: 0.505
+  type: 'test'
+  ...
+# Subtest: dockerRunArgs keeps stdin open only for commands that read input
+ok 82 - dockerRunArgs keeps stdin open only for commands that read input
+  ---
+  duration_ms: 0.224209
+  type: 'test'
+  ...
+# Subtest: dockerRunArgs omits credential env and OAuth mount for setup and verify commands
+ok 83 - dockerRunArgs omits credential env and OAuth mount for setup and verify commands
+  ---
+  duration_ms: 0.417625
+  type: 'test'
+  ...
+# Subtest: createDockerSandbox uses command-scoped env and Codex auth mounts
+ok 84 - createDockerSandbox uses command-scoped env and Codex auth mounts
+  ---
+  duration_ms: 10.766916
+  type: 'test'
+  ...
+# Subtest: dockerBuildArgs labels per-run runtime images
+ok 85 - dockerBuildArgs labels per-run runtime images
+  ---
+  duration_ms: 1.487375
+  type: 'test'
+  ...
+# Subtest: buildRuntimeImage builds a labeled per-run image
+ok 86 - buildRuntimeImage builds a labeled per-run image
+  ---
+  duration_ms: 1.44925
+  type: 'test'
+  ...
+# Subtest: createDockerSandbox creates resources, clones into volume, runs commands, and cleans up
+ok 87 - createDockerSandbox creates resources, clones into volume, runs commands, and cleans up
+  ---
+  duration_ms: 2.629667
+  type: 'test'
+  ...
+# Subtest: createDockerSandbox can attach agent commands to an externally managed service network
+ok 88 - createDockerSandbox can attach agent commands to an externally managed service network
+  ---
+  duration_ms: 0.975792
+  type: 'test'
+  ...
+# Subtest: cleanupManagedDockerResources removes stopped resources and skips active runs by default
+ok 89 - cleanupManagedDockerResources removes stopped resources and skips active runs by default
+  ---
+  duration_ms: 1.053542
+  type: 'test'
+  ...
+# Subtest: cleanupManagedDockerResources --all removes active managed resources explicitly
+ok 90 - cleanupManagedDockerResources --all removes active managed resources explicitly
+  ---
+  duration_ms: 1.021625
+  type: 'test'
+  ...
+# Subtest: cleanupManagedDockerResources reports no-op cleanup without touching artifacts
+ok 91 - cleanupManagedDockerResources reports no-op cleanup without touching artifacts
+  ---
+  duration_ms: 0.290375
+  type: 'test'
+  ...
+# Subtest: doctor reports missing configuration
+ok 92 - doctor reports missing configuration
+  ---
+  duration_ms: 12.0285
+  type: 'test'
+  ...
+# Subtest: doctor validates configured Actions resources
+ok 93 - doctor validates configured Actions resources
+  ---
+  duration_ms: 42.966875
+  type: 'test'
+  ...
+# Subtest: doctor checks local requirements without requiring Actions
+ok 94 - doctor checks local requirements without requiring Actions
+  ---
+  duration_ms: 8.143834
+  type: 'test'
+  ...
+# Subtest: doctor checks Claude credentials when Claude implements
+ok 95 - doctor checks Claude credentials when Claude implements
+  ---
+  duration_ms: 9.332
+  type: 'test'
+  ...
+# Subtest: doctor warns about GitHub credentials and loose permissions in the global file
+ok 96 - doctor warns about GitHub credentials and loose permissions in the global file
+  ---
+  duration_ms: 3.216792
+  type: 'test'
+  ...
+# Subtest: doctor reports which gh account local runs use
+ok 97 - doctor reports which gh account local runs use
+  ---
+  duration_ms: 7.789042
+  type: 'test'
+  ...
+# Subtest: doctor --probe runs each agent once in the runtime image with its own credentials
+ok 98 - doctor --probe runs each agent once in the runtime image with its own credentials
+  ---
+  duration_ms: 10.967375
+  type: 'test'
+  ...
+# Subtest: doctor --probe probes a shared agent assignment once
+ok 99 - doctor --probe probes a shared agent assignment once
+  ---
+  duration_ms: 4.696875
+  type: 'test'
+  ...
+# Subtest: doctor --probe explains rejected credentials and unavailable models
+ok 100 - doctor --probe explains rejected credentials and unavailable models
+  ---
+  duration_ms: 10.287459
+  type: 'test'
+  ...
+# Subtest: doctor --probe reports other failures with the last output line, redacted
+ok 101 - doctor --probe reports other failures with the last output line, redacted
+  ---
+  duration_ms: 10.39375
+  type: 'test'
+  ...
+# Subtest: doctor --probe skips agents when Docker is unavailable or in direct mode
+ok 102 - doctor --probe skips agents when Docker is unavailable or in direct mode
+  ---
+  duration_ms: 14.756625
+  type: 'test'
+  ...
+# Subtest: evidence README lists kinds, sizes and skipped reasons and embeds images
+ok 103 - evidence README lists kinds, sizes and skipped reasons and embeds images
+  ---
+  duration_ms: 1.317042
+  type: 'test'
+  ...
+# Subtest: evidence uses immutable blob URLs, limits embeds, and omits absent evidence
+ok 104 - evidence uses immutable blob URLs, limits embeds, and omits absent evidence
+  ---
+  duration_ms: 0.804292
+  type: 'test'
+  ...
+# hint: Using 'master' as the name for the initial branch. This default branch name
+# hint: is subject to change. To configure the initial branch name to use in all
+# hint: of your new repositories, which will suppress this warning, call:
+# hint: 
+# hint: \\tgit config --global init.defaultBranch <name>
+# hint: 
+# hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+# hint: 'development'. The just-created branch can be renamed via this command:
+# hint: 
+# hint: \\tgit branch -m <name>
+# Subtest: evidence pushes an isolated root commit through the host shell (reports=false)
+ok 105 - evidence pushes an isolated root commit through the host shell (reports=false)
+  ---
+  duration_ms: 298.399375
+  type: 'test'
+  ...
+# hint: Using 'master' as the name for the initial branch. This default branch name
+# hint: is subject to change. To configure the initial branch name to use in all
+# hint: of your new repositories, which will suppress this warning, call:
+# hint: 
+# hint: \\tgit config --global init.defaultBranch <name>
+# hint: 
+# hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+# hint: 'development'. The just-created branch can be renamed via this command:
+# hint: 
+# hint: \\tgit branch -m <name>
+# Subtest: evidence pushes an isolated root commit through the host shell (reports=true)
+ok 106 - evidence pushes an isolated root commit through the host shell (reports=true)
+  ---
+  duration_ms: 215.918417
+  type: 'test'
+  ...
+# Subtest: an evidence push failure is returned with its diagnostic
+ok 107 - an evidence push failure is returned with its diagnostic
+  ---
+  duration_ms: 5.069375
+  type: 'test'
+  ...
+# Subtest: generates a parseable issue-label and dispatch workflow for the target checkout
+ok 108 - generates a parseable issue-label and dispatch workflow for the target checkout
+  ---
+  duration_ms: 21.431792
+  type: 'test'
+  ...
+# Subtest: scopes credentials to credential and issue-management steps
+ok 109 - scopes credentials to credential and issue-management steps
+  ---
+  duration_ms: 7.676084
+  type: 'test'
+  ...
+# Subtest: normalizes all state labels and reports results and artifacts
+ok 110 - normalizes all state labels and reports results and artifacts
+  ---
+  duration_ms: 22.847334
+  type: 'test'
+  ...
+# Subtest: renders an optional job container and generic services
+ok 111 - renders an optional job container and generic services
+  ---
+  duration_ms: 9.437667
+  type: 'test'
+  ...
+# Subtest: rejects versions that are not exact
+ok 112 - rejects versions that are not exact
+  ---
+  duration_ms: 0.664916
+  type: 'test'
+  ...
+# Subtest: installs and authenticates only the configured agent CLIs
+ok 113 - installs and authenticates only the configured agent CLIs
+  ---
+  duration_ms: 7.137958
+  type: 'test'
+  ...
+# Subtest: a Claude-only workflow does not require OpenAI credentials
+ok 114 - a Claude-only workflow does not require OpenAI credentials
+  ---
+  duration_ms: 10.151958
+  type: 'test'
+  ...
+# Subtest: repository workflow keeps the blocked label without a failure comment
+ok 115 - repository workflow keeps the blocked label without a failure comment
+  ---
+  duration_ms: 17.113917
+  type: 'test'
+  ...
+# Subtest: parseGhAccounts lists signed-in github.com accounts and the active one
+ok 116 - parseGhAccounts lists signed-in github.com accounts and the active one
+  ---
+  duration_ms: 6.955583
+  type: 'test'
+  ...
+# Subtest: parseGhAccounts treats unparsable output as no accounts
+ok 117 - parseGhAccounts treats unparsable output as no accounts
+  ---
+  duration_ms: 0.95575
+  type: 'test'
+  ...
+# Subtest: listGhAccounts asks gh for github.com status as JSON
+ok 118 - listGhAccounts asks gh for github.com status as JSON
+  ---
+  duration_ms: 1.492
+  type: 'test'
+  ...
+# Subtest: ghAuthToken selects the account only when one is pinned
+ok 119 - ghAuthToken selects the account only when one is pinned
+  ---
+  duration_ms: 0.134458
+  type: 'test'
+  ...
+# Subtest: ghAuthToken returns null when gh fails or prints nothing
+ok 120 - ghAuthToken returns null when gh fails or prints nothing
+  ---
+  duration_ms: 0.137417
+  type: 'test'
+  ...
+# Subtest: githubAccountSetting distinguishes unset, valid, and invalid values
+ok 121 - githubAccountSetting distinguishes unset, valid, and invalid values
+  ---
+  duration_ms: 0.117666
+  type: 'test'
+  ...
+# Subtest: parseEnvFile parses simple dotenv assignments without leaking examples
+ok 122 - parseEnvFile parses simple dotenv assignments without leaking examples
+  ---
+  duration_ms: 2.501458
+  type: 'test'
+  ...
+# Subtest: parseEnvFile rejects malformed assignments with line numbers
+ok 123 - parseEnvFile rejects malformed assignments with line numbers
+  ---
+  duration_ms: 0.328458
+  type: 'test'
+  ...
+# Subtest: readAgentCageEnv returns empty env when the local secret file is absent
+ok 124 - readAgentCageEnv returns empty env when the local secret file is absent
+  ---
+  duration_ms: 13.829708
+  type: 'test'
+  ...
+# Subtest: readAgentCageEnv reads local secrets from .agent-cage.env
+ok 125 - readAgentCageEnv reads local secrets from .agent-cage.env
+  ---
+  duration_ms: 3.578333
+  type: 'test'
+  ...
+# Subtest: createSecretRedactor replaces known secret values and ignores empty values
+ok 126 - createSecretRedactor replaces known secret values and ignores empty values
+  ---
+  duration_ms: 0.224292
+  type: 'test'
+  ...
+# Subtest: scanDiffForGuardViolations detects injected secrets and high confidence tokens
+ok 127 - scanDiffForGuardViolations detects injected secrets and high confidence tokens
+  ---
+  duration_ms: 0.433875
+  type: 'test'
+  ...
+# Subtest: scanDiffForGuardViolations detects private key material
+ok 128 - scanDiffForGuardViolations detects private key material
+  ---
+  duration_ms: 0.217625
+  type: 'test'
+  ...
+# Subtest: scanDiffForGuardViolations denies real env and auth files
+ok 129 - scanDiffForGuardViolations denies real env and auth files
+  ---
+  duration_ms: 1.225375
+  type: 'test'
+  ...
+# Subtest: assertNoGuardViolations blocks later phases with clear violation details
+ok 130 - assertNoGuardViolations blocks later phases with clear violation details
+  ---
+  duration_ms: 0.415042
+  type: 'test'
+  ...
+# Subtest: scanDiffForGuardViolations allows sample env files unless content looks secret-bearing
+ok 131 - scanDiffForGuardViolations allows sample env files unless content looks secret-bearing
+  ---
+  duration_ms: 0.344417
+  type: 'test'
+  ...
+# Subtest: isSensitiveFilePath classifies auth files and sample env files
+ok 132 - isSensitiveFilePath classifies auth files and sample env files
+  ---
+  duration_ms: 0.115333
+  type: 'test'
+  ...
+# Subtest: guardAttemptDecision retries within the configured bound and fails after it
+ok 133 - guardAttemptDecision retries within the configured bound and fails after it
+  ---
+  duration_ms: 0.113083
+  type: 'test'
+  ...
+# Subtest: parseMarkdownSections nests subsections and ignores headings in code fences
+ok 134 - parseMarkdownSections nests subsections and ignores headings in code fences
+  ---
+  duration_ms: 0.725583
+  type: 'test'
+  ...
+# Subtest: parseBlockerReferences resolves URLs, owner/repo\#N, and \#N against the issue repo
+ok 135 - parseBlockerReferences resolves URLs, owner/repo\#N, and \#N against the issue repo
+  ---
+  duration_ms: 0.62125
+  type: 'test'
+  ...
+# Subtest: checkIssueReadiness fails on open blockers and passes once they are closed
+ok 136 - checkIssueReadiness fails on open blockers and passes once they are closed
+  ---
+  duration_ms: 1.386417
+  type: 'test'
+  ...
+# Subtest: checkIssueReadiness fails closed when a blocker cannot be looked up
+ok 137 - checkIssueReadiness fails closed when a blocker cannot be looked up
+  ---
+  duration_ms: 0.174834
+  type: 'test'
+  ...
+# Subtest: checkIssueReadiness only warns about missing or empty template sections
+ok 138 - checkIssueReadiness only warns about missing or empty template sections
+  ---
+  duration_ms: 0.111917
+  type: 'test'
+  ...
+# Subtest: checkIssueReadiness warns when a Linear issue lists \#N blockers without a repository
+ok 139 - checkIssueReadiness warns when a Linear issue lists \#N blockers without a repository
+  ---
+  duration_ms: 0.118625
+  type: 'test'
+  ...
+# Subtest: parseIssueUrl parses GitHub issue URLs and infers repo
+ok 140 - parseIssueUrl parses GitHub issue URLs and infers repo
+  ---
+  duration_ms: 2.737792
+  type: 'test'
+  ...
+# Subtest: parseIssueUrl parses Linear issue URLs and keys
+ok 141 - parseIssueUrl parses Linear issue URLs and keys
+  ---
+  duration_ms: 0.142083
+  type: 'test'
+  ...
+# Subtest: parseIssueUrl rejects unsupported issue URLs
+ok 142 - parseIssueUrl rejects unsupported issue URLs
+  ---
+  duration_ms: 0.195209
+  type: 'test'
+  ...
+# Subtest: fetchGithubIssueContext fetches issue context and selected human comments
+ok 143 - fetchGithubIssueContext fetches issue context and selected human comments
+  ---
+  duration_ms: 0.488458
+  type: 'test'
+  ...
+# Subtest: fetchLinearIssueContext requires LINEAR_API_KEY
+ok 144 - fetchLinearIssueContext requires LINEAR_API_KEY
+  ---
+  duration_ms: 0.186458
+  type: 'test'
+  ...
+# Subtest: fetchLinearIssueContext fetches issue context and filters comments
+ok 145 - fetchLinearIssueContext fetches issue context and filters comments
+  ---
+  duration_ms: 0.216375
+  type: 'test'
+  ...
+# Subtest: fetchIssueContext dispatches based on URL provider
+ok 146 - fetchIssueContext dispatches based on URL provider
+  ---
+  duration_ms: 0.116959
+  type: 'test'
+  ...
+# Subtest: fetchIssueContext reports HTTP failures
+ok 147 - fetchIssueContext reports HTTP failures
+  ---
+  duration_ms: 0.116792
+  type: 'test'
+  ...
+# Subtest: parseJunit counts testcases under a testsuites root
+ok 148 - parseJunit counts testcases under a testsuites root
+  ---
+  duration_ms: 3.765375
+  type: 'test'
+  ...
+# Subtest: parseJunit reads a single testsuite root and counts one testcase
+ok 149 - parseJunit reads a single testsuite root and counts one testcase
+  ---
+  duration_ms: 0.919583
+  type: 'test'
+  ...
+# Subtest: parseJunit follows nested suites and counts error as failed
+ok 150 - parseJunit follows nested suites and counts error as failed
+  ---
+  duration_ms: 1.350416
+  type: 'test'
+  ...
+# Subtest: parseJunit rejects text that is not JUnit
+ok 151 - parseJunit rejects text that is not JUnit
+  ---
+  duration_ms: 1.0875
+  type: 'test'
+  ...
+# Subtest: formatJunitItems sums files, names each and reports unreadable ones
+ok 152 - formatJunitItems sums files, names each and reports unreadable ones
+  ---
+  duration_ms: 21.428
+  type: 'test'
+  ...
+# Subtest: formatJunitFailures lists at most 20 failures
+ok 153 - formatJunitFailures lists at most 20 failures
+  ---
+  duration_ms: 0.630125
+  type: 'test'
+  ...
+# Subtest: isSqliteExperimentalWarning matches only the node:sqlite warning
+ok 154 - isSqliteExperimentalWarning matches only the node:sqlite warning
+  ---
+  duration_ms: 0.438959
+  type: 'test'
+  ...
+# Subtest: suppressSqliteExperimentalWarning hides the sqlite warning but keeps others
+ok 155 - suppressSqliteExperimentalWarning hides the sqlite warning but keeps others
+  ---
+  duration_ms: 52.47575
+  type: 'test'
+  ...
+# Subtest: the planner skill uses only agent-cage commands and options that exist
+ok 156 - the planner skill uses only agent-cage commands and options that exist
+  ---
+  duration_ms: 67.763208
+  type: 'test'
+  ...
+# Subtest: the planner skill pins runs and revises to Docker with the variable they read
+ok 157 - the planner skill pins runs and revises to Docker with the variable they read
+  ---
+  duration_ms: 11.576792
+  type: 'test'
+  ...
+# Subtest: the planner skill links only to files it ships
+ok 158 - the planner skill links only to files it ships
+  ---
+  duration_ms: 6.408625
+  type: 'test'
+  ...
+# Subtest: detectProject: npm with a lockfile
+ok 159 - detectProject: npm with a lockfile
+  ---
+  duration_ms: 3.96475
+  type: 'test'
+  ...
+# Subtest: detectProject: npm without a lockfile
+ok 160 - detectProject: npm without a lockfile
+  ---
+  duration_ms: 0.314583
+  type: 'test'
+  ...
+# Subtest: detectProject: pnpm
+ok 161 - detectProject: pnpm
+  ---
+  duration_ms: 0.158458
+  type: 'test'
+  ...
+# Subtest: detectProject: yarn 1
+ok 162 - detectProject: yarn 1
+  ---
+  duration_ms: 0.124416
+  type: 'test'
+  ...
+# Subtest: detectProject: yarn berry from packageManager
+ok 163 - detectProject: yarn berry from packageManager
+  ---
+  duration_ms: 1.055667
+  type: 'test'
+  ...
+# Subtest: detectProject: uv
+ok 164 - detectProject: uv
+  ---
+  duration_ms: 0.213208
+  type: 'test'
+  ...
+# Subtest: detectProject: poetry
+ok 165 - detectProject: poetry
+  ---
+  duration_ms: 0.094791
+  type: 'test'
+  ...
+# Subtest: detectProject: requirements.txt installs into a venv outside the workspace
+ok 166 - detectProject: requirements.txt installs into a venv outside the workspace
+  ---
+  duration_ms: 0.093291
+  type: 'test'
+  ...
+# Subtest: detectProject: go
+ok 167 - detectProject: go
+  ---
+  duration_ms: 0.317208
+  type: 'test'
+  ...
+# Subtest: detectProject: rust
+ok 168 - detectProject: rust
+  ---
+  duration_ms: 0.34175
+  type: 'test'
+  ...
+# Subtest: detectProject: maven
+ok 169 - detectProject: maven
+  ---
+  duration_ms: 0.516667
+  type: 'test'
+  ...
+# Subtest: detectProject: maven wrapper
+ok 170 - detectProject: maven wrapper
+  ---
+  duration_ms: 0.076959
+  type: 'test'
+  ...
+# Subtest: detectProject: gradle wrapper
+ok 171 - detectProject: gradle wrapper
+  ---
+  duration_ms: 0.088917
+  type: 'test'
+  ...
+# Subtest: detectProject: gradle without a wrapper is left to the user
+ok 172 - detectProject: gradle without a wrapper is left to the user
+  ---
+  duration_ms: 0.089792
+  type: 'test'
+  ...
+# Subtest: detectProject: Makefile test target when nothing else verifies
+ok 173 - detectProject: Makefile test target when nothing else verifies
+  ---
+  duration_ms: 0.092417
+  type: 'test'
+  ...
+# Subtest: detectProject: Makefile is ignored when an ecosystem already verifies
+ok 174 - detectProject: Makefile is ignored when an ecosystem already verifies
+  ---
+  duration_ms: 0.065958
+  type: 'test'
+  ...
+# Subtest: detectProject: Node tooling next to a Go module
+ok 175 - detectProject: Node tooling next to a Go module
+  ---
+  duration_ms: 0.143125
+  type: 'test'
+  ...
+# Subtest: detectProject: vitest from devDependencies runs one file with npx
+ok 176 - detectProject: vitest from devDependencies runs one file with npx
+  ---
+  duration_ms: 0.094541
+  type: 'test'
+  ...
+# Subtest: detectProject: a test script that builds first has no red-green default
+ok 177 - detectProject: a test script that builds first has no red-green default
+  ---
+  duration_ms: 0.243042
+  type: 'test'
+  ...
+# Subtest: detectProject: nothing recognizable
+ok 178 - detectProject: nothing recognizable
+  ---
+  duration_ms: 0.073333
+  type: 'test'
+  ...
+# Subtest: detectProject offers JUnit for runners the test script runs directly
+ok 179 - detectProject offers JUnit for runners the test script runs directly
+  ---
+  duration_ms: 1.047125
+  type: 'test'
+  ...
+# Subtest: detectProject offers JUnit for pytest
+ok 180 - detectProject offers JUnit for pytest
+  ---
+  duration_ms: 0.087333
+  type: 'test'
+  ...
+# Subtest: generateRuntimeDockerfile installs toolchains as root in a fixed order
+ok 181 - generateRuntimeDockerfile installs toolchains as root in a fixed order
+  ---
+  duration_ms: 0.181375
+  type: 'test'
+  ...
+# Subtest: generateRuntimeDockerfile keeps toolchain PATHs for the sandbox's login shell
+ok 182 - generateRuntimeDockerfile keeps toolchain PATHs for the sandbox's login shell
+  ---
+  duration_ms: 0.05975
+  type: 'test'
+  ...
+# Subtest: detectProject offers browser evidence from dependencies and devDependencies
+ok 183 - detectProject offers browser evidence from dependencies and devDependencies
+  ---
+  duration_ms: 0.6905
+  type: 'test'
+  ...
+# Subtest: Playwright screenshot note for ts with screenshot on
+ok 184 - Playwright screenshot note for ts with screenshot on
+  ---
+  duration_ms: 0.14875
+  type: 'test'
+  ...
+# Subtest: Playwright screenshot note for ts with screenshot only-on-failure
+ok 185 - Playwright screenshot note for ts with screenshot only-on-failure
+  ---
+  duration_ms: 0.129792
+  type: 'test'
+  ...
+# Subtest: Playwright screenshot note for ts with screenshot off
+ok 186 - Playwright screenshot note for ts with screenshot off
+  ---
+  duration_ms: 4.02825
+  type: 'test'
+  ...
+# Subtest: Playwright screenshot note for js with screenshot on
+ok 187 - Playwright screenshot note for js with screenshot on
+  ---
+  duration_ms: 0.193541
+  type: 'test'
+  ...
+# Subtest: Playwright screenshot note for js with screenshot only-on-failure
+ok 188 - Playwright screenshot note for js with screenshot only-on-failure
+  ---
+  duration_ms: 0.108583
+  type: 'test'
+  ...
+# Subtest: Playwright screenshot note for js with screenshot off
+ok 189 - Playwright screenshot note for js with screenshot off
+  ---
+  duration_ms: 0.0965
+  type: 'test'
+  ...
+# Subtest: Playwright screenshot note for mjs with screenshot on
+ok 190 - Playwright screenshot note for mjs with screenshot on
+  ---
+  duration_ms: 0.094708
+  type: 'test'
+  ...
+# Subtest: Playwright screenshot note for mjs with screenshot only-on-failure
+ok 191 - Playwright screenshot note for mjs with screenshot only-on-failure
+  ---
+  duration_ms: 0.096417
+  type: 'test'
+  ...
+# Subtest: Playwright screenshot note for mjs with screenshot off
+ok 192 - Playwright screenshot note for mjs with screenshot off
+  ---
+  duration_ms: 0.279333
+  type: 'test'
+  ...
+# Subtest: Playwright screenshot note for cjs with screenshot on
+ok 193 - Playwright screenshot note for cjs with screenshot on
+  ---
+  duration_ms: 0.240375
+  type: 'test'
+  ...
+# Subtest: Playwright screenshot note for cjs with screenshot only-on-failure
+ok 194 - Playwright screenshot note for cjs with screenshot only-on-failure
+  ---
+  duration_ms: 0.110375
+  type: 'test'
+  ...
+# Subtest: Playwright screenshot note for cjs with screenshot off
+ok 195 - Playwright screenshot note for cjs with screenshot off
+  ---
+  duration_ms: 0.114375
+  type: 'test'
+  ...
+# Subtest: buildPromptContext records present review policy without reading ignored instruction files
+ok 196 - buildPromptContext records present review policy without reading ignored instruction files
+  ---
+  duration_ms: 70.613916
+  type: 'test'
+  ...
+# Subtest: buildPromptContext records missing review policy without failing
+ok 197 - buildPromptContext records missing review policy without failing
+  ---
+  duration_ms: 38.74625
+  type: 'test'
+  ...
+# Subtest: generateBranchName creates run-specific branch names
+ok 198 - generateBranchName creates run-specific branch names
+  ---
+  duration_ms: 1.697333
+  type: 'test'
+  ...
+# Subtest: formatPrBody opens with the review's description, then verification, review, risks, run id, and GitHub closing keyword
+ok 199 - formatPrBody opens with the review's description, then verification, review, risks, run id, and GitHub closing keyword
+  ---
+  duration_ms: 0.300167
+  type: 'test'
+  ...
+# Subtest: formatPrBody falls back to a one-line summary without a review description
+ok 200 - formatPrBody falls back to a one-line summary without a review description
+  ---
+  duration_ms: 0.582334
+  type: 'test'
+  ...
+# Subtest: formatIssueLinkage links Linear issues without closing or mutating them
+ok 201 - formatIssueLinkage links Linear issues without closing or mutating them
+  ---
+  duration_ms: 0.14875
+  type: 'test'
+  ...
+# Subtest: hasPublishableChanges rejects empty status and accepts changed status
+ok 202 - hasPublishableChanges rejects empty status and accepts changed status
+  ---
+  duration_ms: 0.228666
+  type: 'test'
+  ...
+# Subtest: branchExists checks local and remote branches without creating or force pushing
+ok 203 - branchExists checks local and remote branches without creating or force pushing
+  ---
+  duration_ms: 0.670084
+  type: 'test'
+  ...
+# Subtest: publishSuccessfulRun creates one branch, one commit, one push, and one ready PR
+ok 204 - publishSuccessfulRun creates one branch, one commit, one push, and one ready PR
+  ---
+  duration_ms: 0.513125
+  type: 'test'
+  ...
+# Subtest: publishSuccessfulRun supports explicit draft PRs only when requested
+ok 205 - publishSuccessfulRun supports explicit draft PRs only when requested
+  ---
+  duration_ms: 0.154792
+  type: 'test'
+  ...
+# Subtest: publishSuccessfulRun rejects empty diffs before branch creation
+ok 206 - publishSuccessfulRun rejects empty diffs before branch creation
+  ---
+  duration_ms: 0.546333
+  type: 'test'
+  ...
+# Subtest: publishSuccessfulRun fails branch collisions without force pushing
+ok 207 - publishSuccessfulRun fails branch collisions without force pushing
+  ---
+  duration_ms: 0.414417
+  type: 'test'
+  ...
+# Subtest: publishRevision pushes one commit to the PR branch, rewrites the body, and comments with a marker
+ok 208 - publishRevision pushes one commit to the PR branch, rewrites the body, and comments with a marker
+  ---
+  duration_ms: 0.518125
+  type: 'test'
+  ...
+# Subtest: publishRevision keeps the PR body when the review wrote no description
+ok 209 - publishRevision keeps the PR body when the review wrote no description
+  ---
+  duration_ms: 0.129125
+  type: 'test'
+  ...
+# Subtest: publishRevision rejects a revision without changes before committing
+ok 210 - publishRevision rejects a revision without changes before committing
+  ---
+  duration_ms: 0.094458
+  type: 'test'
+  ...
+# Subtest: parsePullRequestUrl accepts pull request URLs, including tab paths
+ok 211 - parsePullRequestUrl accepts pull request URLs, including tab paths
+  ---
+  duration_ms: 4.9995
+  type: 'test'
+  ...
+# Subtest: the run ID and issue link round-trip through an Agent Cage PR body
+ok 212 - the run ID and issue link round-trip through an Agent Cage PR body
+  ---
+  duration_ms: 0.297125
+  type: 'test'
+  ...
+# Subtest: revise markers round-trip
+ok 213 - revise markers round-trip
+  ---
+  duration_ms: 0.157208
+  type: 'test'
+  ...
+# Subtest: selectFeedback takes unresolved threads and only comments and reviews after the last revise, from people with write access
+ok 214 - selectFeedback takes unresolved threads and only comments and reviews after the last revise, from people with write access
+  ---
+  duration_ms: 1.457542
+  type: 'test'
+  ...
+# Subtest: fetchRevision reads the pull request, its comments, reviews, and review threads
+ok 215 - fetchRevision reads the pull request, its comments, reviews, and review threads
+  ---
+  duration_ms: 79.640083
+  type: 'test'
+  ...
+# Subtest: fetchRevision rejects a pull request that is closed
+ok 216 - fetchRevision rejects a pull request that is closed
+  ---
+  duration_ms: 1.847416
+  type: 'test'
+  ...
+# Subtest: fetchRevision rejects a pull request that is from a fork
+ok 217 - fetchRevision rejects a pull request that is from a fork
+  ---
+  duration_ms: 1.460541
+  type: 'test'
+  ...
+# Subtest: fetchRevision rejects a pull request that is not opened by Agent Cage
+ok 218 - fetchRevision rejects a pull request that is not opened by Agent Cage
+  ---
+  duration_ms: 0.531417
+  type: 'test'
+  ...
+# Subtest: fetchRevision fails with no_feedback when there is nothing to address
+ok 219 - fetchRevision fails with no_feedback when there is nothing to address
+  ---
+  duration_ms: 12.810375
+  type: 'test'
+  ...
+# Subtest: QA harness covers success, verify failure, review blocking, secret guard failure, and no-op diff
+ok 220 - QA harness covers success, verify failure, review blocking, secret guard failure, and no-op diff
+  ---
+  duration_ms: 47.26875
+  type: 'test'
+  ...
+# Subtest: the red check passes a test written before the code, which fails on the code as it stands
+ok 221 - the red check passes a test written before the code, which fails on the code as it stands
+  ---
+  duration_ms: 355.085917
+  type: 'test'
+  ...
+# Subtest: the red check reads a multi-line error as its reason
+ok 222 - the red check reads a multi-line error as its reason
+  ---
+  duration_ms: 172.599042
+  type: 'test'
+  ...
+# Subtest: the red check flags a test that already passes before the code
+ok 223 - the red check flags a test that already passes before the code
+  ---
+  duration_ms: 94.801
+  type: 'test'
+  ...
+# Subtest: the red check reverts code the red step wrote, and keeps support files
+ok 224 - the red check reverts code the red step wrote, and keeps support files
+  ---
+  duration_ms: 130.498625
+  type: 'test'
+  ...
+# Subtest: a later red step is checked against the code earlier iterations wrote
+ok 225 - a later red step is checked against the code earlier iterations wrote
+  ---
+  duration_ms: 108.5875
+  type: 'test'
+  ...
+# Subtest: the test lock finds changed, added and deleted tests, and restores them
+ok 226 - the test lock finds changed, added and deleted tests, and restores them
+  ---
+  duration_ms: 64.809042
+  type: 'test'
+  ...
+# Subtest: the green check runs the tests written first and skips a deleted one
+ok 227 - the green check runs the tests written first and skips a deleted one
+  ---
+  duration_ms: 162.029375
+  type: 'test'
+  ...
+# Subtest: the PR lines and the review summary describe each test written first
+ok 228 - the PR lines and the review summary describe each test written first
+  ---
+  duration_ms: 0.372417
+  type: 'test'
+  ...
+# Subtest: a later red step replaces a file's earlier result
+ok 229 - a later red step replaces a file's earlier result
+  ---
+  duration_ms: 0.150875
+  type: 'test'
+  ...
+# Subtest: parseGithubRepo normalizes owner/name strings
+ok 230 - parseGithubRepo normalizes owner/name strings
+  ---
+  duration_ms: 2.852625
+  type: 'test'
+  ...
+# Subtest: parseGithubRepo normalizes GitHub HTTPS remotes
+ok 231 - parseGithubRepo normalizes GitHub HTTPS remotes
+  ---
+  duration_ms: 0.23575
+  type: 'test'
+  ...
+# Subtest: parseGithubRepo normalizes GitHub SSH remotes
+ok 232 - parseGithubRepo normalizes GitHub SSH remotes
+  ---
+  duration_ms: 0.132167
+  type: 'test'
+  ...
+# Subtest: resolveTargetRepo prefers explicit repo
+ok 233 - resolveTargetRepo prefers explicit repo
+  ---
+  duration_ms: 0.536334
+  type: 'test'
+  ...
+# Subtest: resolveTargetRepo uses GitHub issue inferred repo
+ok 234 - resolveTargetRepo uses GitHub issue inferred repo
+  ---
+  duration_ms: 0.619125
+  type: 'test'
+  ...
+# Subtest: resolveTargetRepo fails on GitHub issue and cwd origin mismatch
+ok 235 - resolveTargetRepo fails on GitHub issue and cwd origin mismatch
+  ---
+  duration_ms: 3.441167
+  type: 'test'
+  ...
+# Subtest: resolveTargetRepo uses cwd origin for Linear issue
+ok 236 - resolveTargetRepo uses cwd origin for Linear issue
+  ---
+  duration_ms: 0.236042
+  type: 'test'
+  ...
+# Subtest: resolveTargetRepo fails when no repo source exists
+ok 237 - resolveTargetRepo fails when no repo source exists
+  ---
+  duration_ms: 0.122292
+  type: 'test'
+  ...
+# Subtest: createAuthenticatedRepo validates token but returns tokenless HTTPS clone URL
+ok 238 - createAuthenticatedRepo validates token but returns tokenless HTTPS clone URL
+  ---
+  duration_ms: 0.324708
+  type: 'test'
+  ...
+# Subtest: createAuthenticatedRepo requires GITHUB_TOKEN
+ok 239 - createAuthenticatedRepo requires GITHUB_TOKEN
+  ---
+  duration_ms: 0.338417
+  type: 'test'
+  ...
+# Subtest: redactGithubToken removes token values from logs
+ok 240 - redactGithubToken removes token values from logs
+  ---
+  duration_ms: 0.717709
+  type: 'test'
+  ...
+# Subtest: reports config defaults to no report files and rejects paths outside the repository
+ok 241 - reports config defaults to no report files and rejects paths outside the repository
+  ---
+  duration_ms: 12.742167
+  type: 'test'
+  ...
+# Subtest: report listings keep each file under the kind printed before it
+ok 242 - report listings keep each file under the kind printed before it
+  ---
+  duration_ms: 0.353333
+  type: 'test'
+  ...
+# Subtest: a report dump must name known files and deliver every byte it announced
+ok 243 - a report dump must name known files and deliver every byte it announced
+  ---
+  duration_ms: 0.407167
+  type: 'test'
+  ...
+# Subtest: prepared report paths stay out of git status, and tracked matches are a config error
+ok 244 - prepared report paths stay out of git status, and tracked matches are a config error
+  ---
+  duration_ms: 120.313333
+  type: 'test'
+  ...
+# Subtest: clearing reports deletes only untracked files that match the report paths
+ok 245 - clearing reports deletes only untracked files that match the report paths
+  ---
+  duration_ms: 68.427042
+  type: 'test'
+  ...
+# Subtest: collecting reports copies regular files byte for byte and skips links and oversized files
+ok 246 - collecting reports copies regular files byte for byte and skips links and oversized files
+  ---
+  duration_ms: 99.792583
+  type: 'test'
+  ...
+# Subtest: collecting reports stops at the file and total limits
+ok 247 - collecting reports stops at the file and total limits
+  ---
+  duration_ms: 49.208959
+  type: 'test'
+  ...
+# Subtest: collecting reports with no matching files writes an empty manifest
+ok 248 - collecting reports with no matching files writes an empty manifest
+  ---
+  duration_ms: 25.696833
+  type: 'test'
+  ...
+# Subtest: buildReviewPrompt includes read-only instructions and required context
+ok 249 - buildReviewPrompt includes read-only instructions and required context
+  ---
+  duration_ms: 2.884125
+  type: 'test'
+  ...
+# Subtest: a passed command shows the reviewer only the last lines of each output stream
+ok 250 - a passed command shows the reviewer only the last lines of each output stream
+  ---
+  duration_ms: 0.344708
+  type: 'test'
+  ...
+# Subtest: buildReviewPrompt explains the red-green results only when the run wrote tests first
+ok 251 - buildReviewPrompt explains the red-green results only when the run wrote tests first
+  ---
+  duration_ms: 0.852291
+  type: 'test'
+  ...
+# Subtest: buildReviewPrompt asks a passing review for a PR description that follows the repo's rules
+ok 252 - buildReviewPrompt asks a passing review for a PR description that follows the repo's rules
+  ---
+  duration_ms: 0.294625
+  type: 'test'
+  ...
+# Subtest: parseReviewReport accepts strict structured JSON from the review agent
+ok 253 - parseReviewReport accepts strict structured JSON from the review agent
+  ---
+  duration_ms: 9.143833
+  type: 'test'
+  ...
+# Subtest: parseReviewReport ignores non-json fenced blocks before JSON
+ok 254 - parseReviewReport ignores non-json fenced blocks before JSON
+  ---
+  duration_ms: 0.794958
+  type: 'test'
+  ...
+# Subtest: parseReviewReport normalizes nullable structured output fields
+ok 255 - parseReviewReport normalizes nullable structured output fields
+  ---
+  duration_ms: 0.408042
+  type: 'test'
+  ...
+# Subtest: parseReviewReport keeps a PR description only from a passing review
+ok 256 - parseReviewReport keeps a PR description only from a passing review
+  ---
+  duration_ms: 0.428875
+  type: 'test'
+  ...
+# Subtest: review report JSON schema requires every finding property
+ok 257 - review report JSON schema requires every finding property
+  ---
+  duration_ms: 0.419167
+  type: 'test'
+  ...
+# Subtest: parseReviewReport rejects passing reports with blocking findings
+ok 258 - parseReviewReport rejects passing reports with blocking findings
+  ---
+  duration_ms: 0.887625
+  type: 'test'
+  ...
+# Subtest: reviewNextAction allows passing review to continue
+ok 259 - reviewNextAction allows passing review to continue
+  ---
+  duration_ms: 0.170708
+  type: 'test'
+  ...
+# Subtest: reviewNextAction feeds blocking findings back until max review cycles
+ok 260 - reviewNextAction feeds blocking findings back until max review cycles
+  ---
+  duration_ms: 4.571417
+  type: 'test'
+  ...
+# Subtest: blockingReviewFeedback formats blocking findings for the implementer
+ok 261 - blockingReviewFeedback formats blocking findings for the implementer
+  ---
+  duration_ms: 0.108375
+  type: 'test'
+  ...
+# Subtest: runIndependentReview runs a fresh review runner and returns parsed action
+ok 262 - runIndependentReview runs a fresh review runner and returns parsed action
+  ---
+  duration_ms: 0.552542
+  type: 'test'
+  ...
+# Subtest: runIndependentReview fails if the read-only review changes the diff
+ok 263 - runIndependentReview fails if the read-only review changes the diff
+  ---
+  duration_ms: 0.69825
+  type: 'test'
+  ...
+# Subtest: RunEvent schema is versioned, strict, and validates canonical activity context
+ok 264 - RunEvent schema is versioned, strict, and validates canonical activity context
+  ---
+  duration_ms: 12.757833
+  type: 'test'
+  ...
+# Subtest: RunEventJournal sequences, redacts, bounds, and appends before delivery
+ok 265 - RunEventJournal sequences, redacts, bounds, and appends before delivery
+  ---
+  duration_ms: 54.08825
+  type: 'test'
+  ...
+# Subtest: RunEventJournal keeps durable sequencing when observer delivery fails
+ok 266 - RunEventJournal keeps durable sequencing when observer delivery fails
+  ---
+  duration_ms: 12.604209
+  type: 'test'
+  ...
+# Subtest: replay validates NDJSON, ignores exact duplicate delivery, and restores outcomes
+ok 267 - replay validates NDJSON, ignores exact duplicate delivery, and restores outcomes
+  ---
+  duration_ms: 46.293542
+  type: 'test'
+  ...
+# Subtest: legacy phases map deterministically to canonical Stages
+ok 268 - legacy phases map deterministically to canonical Stages
+  ---
+  duration_ms: 0.140959
+  type: 'test'
+  ...
+# (node:394) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: runAgentCage reaches every gate and opens a PR in docker mode
+ok 269 - runAgentCage reaches every gate and opens a PR in docker mode
+  ---
+  duration_ms: 377.592125
+  type: 'test'
+  ...
+# Subtest: runAgentCage reaches every gate and opens a PR in direct mode
+ok 270 - runAgentCage reaches every gate and opens a PR in direct mode
+  ---
+  duration_ms: 213.648125
+  type: 'test'
+  ...
+# Subtest: runAgentCage parses review agent stdout without command log noise
+ok 271 - runAgentCage parses review agent stdout without command log noise
+  ---
+  duration_ms: 172.306541
+  type: 'test'
+  ...
+# Subtest: runAgentCage executes the happy path and records a successful run
+ok 272 - runAgentCage executes the happy path and records a successful run
+  ---
+  duration_ms: 166.420209
+  type: 'test'
+  ...
+# Subtest: runAgentCage runs direct mode on the host without Docker resources
+ok 273 - runAgentCage runs direct mode on the host without Docker resources
+  ---
+  duration_ms: 146.663791
+  type: 'test'
+  ...
+# Failed to report run failure: HTTP 401: Bad credentials (https://api.github.com/graphql)
+# Try authenticating with:  gh auth login -h github.com
+# Subtest: runAgentCage redacts credential-bearing publish failures in artifacts
+ok 274 - runAgentCage redacts credential-bearing publish failures in artifacts
+  ---
+  duration_ms: 422.953292
+  type: 'test'
+  ...
+# Subtest: runAgentCage builds configured runtime Dockerfiles before cloning
+ok 275 - runAgentCage builds configured runtime Dockerfiles before cloning
+  ---
+  duration_ms: 99.645667
+  type: 'test'
+  ...
+# Failed to report run failure: HTTP 401: Bad credentials (https://api.github.com/graphql)
+# Try authenticating with:  gh auth login -h github.com
+# Subtest: runAgentCage records runtime image build failures
+ok 276 - runAgentCage records runtime image build failures
+  ---
+  duration_ms: 348.76875
+  type: 'test'
+  ...
+# Subtest: runAgentCage preserves accepted changes before the publisher commits the workspace
+ok 277 - runAgentCage preserves accepted changes before the publisher commits the workspace
+  ---
+  duration_ms: 81.264042
+  type: 'test'
+  ...
+# Failed to report run failure: HTTP 401: Bad credentials (https://api.github.com/graphql)
+# Try authenticating with:  gh auth login -h github.com
+# Subtest: runAgentCage records verify failure after max iterations
+ok 278 - runAgentCage records verify failure after max iterations
+  ---
+  duration_ms: 362.692959
+  type: 'test'
+  ...
+# Subtest: runAgentCage records retries as distinct canonical Stage Attempts
+ok 279 - runAgentCage records retries as distinct canonical Stage Attempts
+  ---
+  duration_ms: 101.379584
+  type: 'test'
+  ...
+# Failed to report run failure: HTTP 401: Bad credentials (https://api.github.com/graphql)
+# Try authenticating with:  gh auth login -h github.com
+# Subtest: runAgentCage writes a replayable terminal history for review blocking
+ok 280 - runAgentCage writes a replayable terminal history for review blocking
+  ---
+  duration_ms: 357.144333
+  type: 'test'
+  ...
+# Failed to report run failure: HTTP 401: Bad credentials (https://api.github.com/graphql)
+# Try authenticating with:  gh auth login -h github.com
+# Subtest: runAgentCage writes a replayable terminal history for secret guard exhaustion
+ok 281 - runAgentCage writes a replayable terminal history for secret guard exhaustion
+  ---
+  duration_ms: 381.232833
+  type: 'test'
+  ...
+# Failed to report run failure: HTTP 401: Bad credentials (https://api.github.com/graphql)
+# Try authenticating with:  gh auth login -h github.com
+# Subtest: runAgentCage writes a replayable terminal history for verification timeout
+ok 282 - runAgentCage writes a replayable terminal history for verification timeout
+  ---
+  duration_ms: 354.253542
+  type: 'test'
+  ...
+# Failed to report run failure: HTTP 401: Bad credentials (https://api.github.com/graphql)
+# Try authenticating with:  gh auth login -h github.com
+# Subtest: runAgentCage writes a replayable terminal history for no diff publish
+ok 283 - runAgentCage writes a replayable terminal history for no diff publish
+  ---
+  duration_ms: 403.337542
+  type: 'test'
+  ...
+# Subtest: runAgentCage writes tests first, locks them while the code is written, and writes new tests for a blocking review
+ok 284 - runAgentCage writes tests first, locks them while the code is written, and writes new tests for a blocking review
+  ---
+  duration_ms: 729.390792
+  type: 'test'
+  ...
+# Subtest: runAgentCage writes no tests first unless the repo configures red-green
+ok 285 - runAgentCage writes no tests first unless the repo configures red-green
+  ---
+  duration_ms: 71.32425
+  type: 'test'
+  ...
+# Subtest: runAgentCage implements with Claude and reviews with Codex using scoped credentials
+ok 286 - runAgentCage implements with Claude and reviews with Codex using scoped credentials
+  ---
+  duration_ms: 74.872833
+  type: 'test'
+  ...
+# Failed to report run failure: HTTP 401: Bad credentials (https://api.github.com/graphql)
+# Try authenticating with:  gh auth login -h github.com
+# Subtest: runAgentCage reports a missing base branch as clone_failed
+ok 287 - runAgentCage reports a missing base branch as clone_failed
+  ---
+  duration_ms: 318.290584
+  type: 'test'
+  ...
+# Failed to report run failure: HTTP 401: Bad credentials (https://api.github.com/graphql)
+# Try authenticating with:  gh auth login -h github.com
+# Subtest: runAgentCage reports a rejected Claude token as agent_auth_failed
+ok 288 - runAgentCage reports a rejected Claude token as agent_auth_failed
+  ---
+  duration_ms: 352.738416
+  type: 'test'
+  ...
+# Failed to report run failure: HTTP 401: Bad credentials (https://api.github.com/graphql)
+# Try authenticating with:  gh auth login -h github.com
+# Subtest: runAgentCage reports other implementation errors as implement_failed
+ok 289 - runAgentCage reports other implementation errors as implement_failed
+  ---
+  duration_ms: 351.062792
+  type: 'test'
+  ...
+# Failed to report run failure: HTTP 401: Bad credentials (https://api.github.com/graphql)
+# Try authenticating with:  gh auth login -h github.com
+# Subtest: runAgentCage reports an unsupported review model as agent_model_unavailable
+ok 290 - runAgentCage reports an unsupported review model as agent_model_unavailable
+  ---
+  duration_ms: 379.759667
+  type: 'test'
+  ...
+# Subtest: reviseAgentCagePullRequest revises the PR branch from its feedback and publishes a revision
+ok 291 - reviseAgentCagePullRequest revises the PR branch from its feedback and publishes a revision
+  ---
+  duration_ms: 100.441458
+  type: 'test'
+  ...
+# Subtest: runAgentCage shows JUnit results in the PR body Verification section
+ok 292 - runAgentCage shows JUnit results in the PR body Verification section
+  ---
+  duration_ms: 155.655292
+  type: 'test'
+  ...
+# Subtest: runAgentCage feeds failed JUnit tests, redacted, into the retry prompt
+ok 293 - runAgentCage feeds failed JUnit tests, redacted, into the retry prompt
+  ---
+  duration_ms: 166.335041
+  type: 'test'
+  ...
+# Subtest: runAgentCage collects each verify's report files and keeps them out of the change
+ok 294 - runAgentCage collects each verify's report files and keeps them out of the change
+  ---
+  duration_ms: 142.240167
+  type: 'test'
+  ...
+# Subtest: failed docker run reports evidence: github
+ok 295 - failed docker run reports evidence: github
+  ---
+  duration_ms: 90.143959
+  type: 'test'
+  ...
+# Subtest: failed docker run reports evidence: linear
+ok 296 - failed docker run reports evidence: linear
+  ---
+  duration_ms: 78.808958
+  type: 'test'
+  ...
+# Failed to report run failure: API unavailable
+# Subtest: failed docker run reports evidence: comment-error
+ok 297 - failed docker run reports evidence: comment-error
+  ---
+  duration_ms: 110.98475
+  type: 'test'
+  ...
+# Subtest: failed docker run reports evidence: revision
+ok 298 - failed docker run reports evidence: revision
+  ---
+  duration_ms: 85.259584
+  type: 'test'
+  ...
+# Subtest: failed direct run reports evidence: github
+ok 299 - failed direct run reports evidence: github
+  ---
+  duration_ms: 83.70275
+  type: 'test'
+  ...
+# Subtest: failed direct run reports evidence: linear
+ok 300 - failed direct run reports evidence: linear
+  ---
+  duration_ms: 100.298625
+  type: 'test'
+  ...
+# Failed to report run failure: API unavailable
+# Subtest: failed direct run reports evidence: comment-error
+ok 301 - failed direct run reports evidence: comment-error
+  ---
+  duration_ms: 90.600875
+  type: 'test'
+  ...
+# Subtest: failed direct run reports evidence: revision
+ok 302 - failed direct run reports evidence: revision
+  ---
+  duration_ms: 87.332041
+  type: 'test'
+  ...
+# Subtest: docker shell runner finds the docker CLI and daemon from the host environment
+ok 303 - docker shell runner finds the docker CLI and daemon from the host environment
+  ---
+  duration_ms: 26.709041
+  type: 'test'
+  ...
+# Subtest: docker shell runner reports a missing docker CLI as docker_unavailable
+ok 304 - docker shell runner reports a missing docker CLI as docker_unavailable
+  ---
+  duration_ms: 17.144708
+  type: 'test'
+  ...
+# Subtest: docker shell runner reports an unreachable daemon as docker_unavailable
+ok 305 - docker shell runner reports an unreachable daemon as docker_unavailable
+  ---
+  duration_ms: 10.990917
+  type: 'test'
+  ...
+# Subtest: docker shell runner returns failures of the sandbox command itself
+ok 306 - docker shell runner returns failures of the sandbox command itself
+  ---
+  duration_ms: 23.895916
+  type: 'test'
+  ...
+# Cannot connect to the Docker daemon
+# Subtest: docker runner reports a missing CLI or daemon as docker_unavailable
+ok 307 - docker runner reports a missing CLI or daemon as docker_unavailable
+  ---
+  duration_ms: 25.944917
+  type: 'test'
+  ...
+# Subtest: docker runner keeps the command's own error when Docker is available
+ok 308 - docker runner keeps the command's own error when Docker is available
+  ---
+  duration_ms: 18.489917
+  type: 'test'
+  ...
+# Subtest: agentCommandFailure maps timeouts, provider errors, and other failures
+ok 309 - agentCommandFailure maps timeouts, provider errors, and other failures
+  ---
+  duration_ms: 10.588875
+  type: 'test'
+  ...
+# Subtest: host shell runner runs commands in the workspace directory
+ok 310 - host shell runner runs commands in the workspace directory
+  ---
+  duration_ms: 14.979792
+  type: 'test'
+  ...
+# Subtest: host shell runner surfaces non-zero exit codes without throwing
+ok 311 - host shell runner surfaces non-zero exit codes without throwing
+  ---
+  duration_ms: 9.3815
+  type: 'test'
+  ...
+# Subtest: host shell runner writes input to stdin and closes stdin without it
+ok 312 - host shell runner writes input to stdin and closes stdin without it
+  ---
+  duration_ms: 14.054625
+  type: 'test'
+  ...
+# Subtest: host shell runner merges base env with per-command env
+ok 313 - host shell runner merges base env with per-command env
+  ---
+  duration_ms: 5.32425
+  type: 'test'
+  ...
+# Subtest: host shell runner does not inherit ambient credentials
+ok 314 - host shell runner does not inherit ambient credentials
+  ---
+  duration_ms: 3.468583
+  type: 'test'
+  ...
+# Subtest: host shell runner supports shell operators like the docker runner
+ok 315 - host shell runner supports shell operators like the docker runner
+  ---
+  duration_ms: 3.216917
+  type: 'test'
+  ...
+# Subtest: host shell runner closes stdin so stdin-reading commands do not hang
+ok 316 - host shell runner closes stdin so stdin-reading commands do not hang
+  ---
+  duration_ms: 7.622334
+  type: 'test'
+  ...
+# Subtest: host shell runner enforces idle and total timeouts
+ok 317 - host shell runner enforces idle and total timeouts
+  ---
+  duration_ms: 2014.333209
+  type: 'test'
+  ...
+# Subtest: host shell runner configures git askpass when a GitHub token is present
+ok 318 - host shell runner configures git askpass when a GitHub token is present
+  ---
+  duration_ms: 3.914709
+  type: 'test'
+  ...
+# Subtest: host shell runner leaves git askpass unset without a GitHub token
+ok 319 - host shell runner leaves git askpass unset without a GitHub token
+  ---
+  duration_ms: 2.036209
+  type: 'test'
+  ...
+# Subtest: codex auth logs in with the API key when one is present
+ok 320 - codex auth logs in with the API key when one is present
+  ---
+  duration_ms: 0.143625
+  type: 'test'
+  ...
+# Subtest: codex auth copies the OAuth file when no API key is present
+ok 321 - codex auth copies the OAuth file when no API key is present
+  ---
+  duration_ms: 0.076416
+  type: 'test'
+  ...
+# Subtest: codex auth is a no-op for commands without credentials
+ok 322 - codex auth is a no-op for commands without credentials
+  ---
+  duration_ms: 0.040958
+  type: 'test'
+  ...
+# Subtest: codex exec uses the sandbox flag by default
+ok 323 - codex exec uses the sandbox flag by default
+  ---
+  duration_ms: 0.070958
+  type: 'test'
+  ...
+# Subtest: codex exec bypasses the sandbox in direct mode
+ok 324 - codex exec bypasses the sandbox in direct mode
+  ---
+  duration_ms: 0.034709
+  type: 'test'
+  ...
+# Subtest: line stream sink redacts complete lines and flushes the remainder
+ok 325 - line stream sink redacts complete lines and flushes the remainder
+  ---
+  duration_ms: 0.45425
+  type: 'test'
+  ...
+# Subtest: host shell runner streams live output while still buffering the result
+ok 326 - host shell runner streams live output while still buffering the result
+  ---
+  duration_ms: 4.548417
+  type: 'test'
+  ...
+# Subtest: createHostWorkspace makes an empty directory and cleans it up
+ok 327 - createHostWorkspace makes an empty directory and cleans it up
+  ---
+  duration_ms: 0.793083
+  type: 'test'
+  ...
+# Subtest: setup detects commands and enables both local Docker and Actions
+ok 328 - setup detects commands and enables both local Docker and Actions
+  ---
+  duration_ms: 127.645292
+  type: 'test'
+  ...
+# Subtest: setup offers test-first runs (red-green) for a detected test runner
+ok 329 - setup offers test-first runs (red-green) for a detected test runner
+  ---
+  duration_ms: 76.264292
+  type: 'test'
+  ...
+# Subtest: setup turns on test-first runs only when asked, and --yes leaves an existing config alone
+ok 330 - setup turns on test-first runs only when asked, and --yes leaves an existing config alone
+  ---
+  duration_ms: 39.567417
+  type: 'test'
+  ...
+# Subtest: setup is rerunnable and preserves unknown config
+ok 331 - setup is rerunnable and preserves unknown config
+  ---
+  duration_ms: 17.140375
+  type: 'test'
+  ...
+# Subtest: disabling Actions removes only a managed workflow
+ok 332 - disabling Actions removes only a managed workflow
+  ---
+  duration_ms: 25.748792
+  type: 'test'
+  ...
+# Subtest: setup refuses to replace an unmanaged workflow
+ok 333 - setup refuses to replace an unmanaged workflow
+  ---
+  duration_ms: 9.005667
+  type: 'test'
+  ...
+# Subtest: dry-run reports changes without writing files
+ok 334 - dry-run reports changes without writing files
+  ---
+  duration_ms: 10.030292
+  type: 'test'
+  ...
+# Subtest: setup writes local secrets with restricted permissions
+ok 335 - setup writes local secrets with restricted permissions
+  ---
+  duration_ms: 21.15375
+  type: 'test'
+  ...
+# Subtest: setup never overwrites existing review policy or env example
+ok 336 - setup never overwrites existing review policy or env example
+  ---
+  duration_ms: 22.161792
+  type: 'test'
+  ...
+# Subtest: setup dry-run reports scaffold files without writing them
+ok 337 - setup dry-run reports scaffold files without writing them
+  ---
+  duration_ms: 12.156334
+  type: 'test'
+  ...
+# Subtest: setup merges missing keys into an existing env example
+ok 338 - setup merges missing keys into an existing env example
+  ---
+  duration_ms: 26.059875
+  type: 'test'
+  ...
+# Subtest: interactive setup implements with Claude and reviews with Codex by default
+ok 339 - interactive setup implements with Claude and reviews with Codex by default
+  ---
+  duration_ms: 28.167292
+  type: 'test'
+  ...
+# Subtest: non-interactive setup falls back to Codex without Claude credentials
+ok 340 - non-interactive setup falls back to Codex without Claude credentials
+  ---
+  duration_ms: 27.081459
+  type: 'test'
+  ...
+# Subtest: non-interactive setup picks Claude when the global file has a Claude token
+ok 341 - non-interactive setup picks Claude when the global file has a Claude token
+  ---
+  duration_ms: 22.078041
+  type: 'test'
+  ...
+# Subtest: setup keeps the agents of an existing config
+ok 342 - setup keeps the agents of an existing config
+  ---
+  duration_ms: 16.650709
+  type: 'test'
+  ...
+# Subtest: setup saves agent credentials to the global file and GitHub to the repo
+ok 343 - setup saves agent credentials to the global file and GitHub to the repo
+  ---
+  duration_ms: 25.526375
+  type: 'test'
+  ...
+# Subtest: setup pins the chosen gh account instead of asking for GITHUB_TOKEN
+ok 344 - setup pins the chosen gh account instead of asking for GITHUB_TOKEN
+  ---
+  duration_ms: 21.1925
+  type: 'test'
+  ...
+# Subtest: setup --yes pins the active gh account
+ok 345 - setup --yes pins the active gh account
+  ---
+  duration_ms: 16.262541
+  type: 'test'
+  ...
+# Subtest: setup --yes keeps a pinned gh account that is no longer signed in
+ok 346 - setup --yes keeps a pinned gh account that is no longer signed in
+  ---
+  duration_ms: 18.713333
+  type: 'test'
+  ...
+# Subtest: setup --yes detects a Go project and generates a runtime Dockerfile
+ok 347 - setup --yes detects a Go project and generates a runtime Dockerfile
+  ---
+  duration_ms: 18.221625
+  type: 'test'
+  ...
+# Subtest: setup references an existing runtime Dockerfile without overwriting it
+ok 348 - setup references an existing runtime Dockerfile without overwriting it
+  ---
+  duration_ms: 23.686875
+  type: 'test'
+  ...
+# Subtest: setup skips the runtime Dockerfile when the user declines it
+ok 349 - setup skips the runtime Dockerfile when the user declines it
+  ---
+  duration_ms: 16.639125
+  type: 'test'
+  ...
+# Subtest: setup leaves a config that already sets runtime.dockerfile
+ok 350 - setup leaves a config that already sets runtime.dockerfile
+  ---
+  duration_ms: 16.498083
+  type: 'test'
+  ...
+# Subtest: setup adds no runtime Dockerfile for an npm project
+ok 351 - setup adds no runtime Dockerfile for an npm project
+  ---
+  duration_ms: 21.469709
+  type: 'test'
+  ...
+# Subtest: setup takes the Codex model from config.toml for a ChatGPT login
+ok 352 - setup takes the Codex model from config.toml for a ChatGPT login
+  ---
+  duration_ms: 25.208291
+  type: 'test'
+  ...
+# Subtest: setup warns when a ChatGPT login has no model in config.toml
+ok 353 - setup warns when a ChatGPT login has no model in config.toml
+  ---
+  duration_ms: 15.941375
+  type: 'test'
+  ...
+# Subtest: setup keeps the API default Codex model when OPENAI_API_KEY is set
+ok 354 - setup keeps the API default Codex model when OPENAI_API_KEY is set
+  ---
+  duration_ms: 16.962708
+  type: 'test'
+  ...
+# Subtest: setup offers the node:test JUnit reporter and writes verify and reports.junit
+ok 355 - setup offers the node:test JUnit reporter and writes verify and reports.junit
+  ---
+  duration_ms: 17.145125
+  type: 'test'
+  ...
+# Subtest: setup offers the vitest JUnit reporter and writes verify and reports.junit
+ok 356 - setup offers the vitest JUnit reporter and writes verify and reports.junit
+  ---
+  duration_ms: 26.313542
+  type: 'test'
+  ...
+# Subtest: declining the JUnit offer leaves verify and reports alone
+ok 357 - declining the JUnit offer leaves verify and reports alone
+  ---
+  duration_ms: 23.780584
+  type: 'test'
+  ...
+# Subtest: setup --yes adds JUnit only to a new config
+ok 358 - setup --yes adds JUnit only to a new config
+  ---
+  duration_ms: 45.514375
+  type: 'test'
+  ...
+# Subtest: setup offers Jest JUnit only when jest-junit is a dependency
+ok 359 - setup offers Jest JUnit only when jest-junit is a dependency
+  ---
+  duration_ms: 51.086125
+  type: 'test'
+  ...
+# Subtest: setup accepts evidence while keeping accepted JUnit
+ok 360 - setup accepts evidence while keeping accepted JUnit
+  ---
+  duration_ms: 13.879
+  type: 'test'
+  ...
+# Subtest: setup declines evidence while keeping accepted JUnit
+ok 361 - setup declines evidence while keeping accepted JUnit
+  ---
+  duration_ms: 18.55775
+  type: 'test'
+  ...
+# Subtest: existing evidence skips the question and survives the JUnit offer
+ok 362 - existing evidence skips the question and survives the JUnit offer
+  ---
+  duration_ms: 15.082833
+  type: 'test'
+  ...
+# Subtest: setup --yes adds evidence only to a new config
+ok 363 - setup --yes adds evidence only to a new config
+  ---
+  duration_ms: 40.90075
+  type: 'test'
+  ...
+# Subtest: evidence can be accepted without a JUnit offer in new and existing configs
+ok 364 - evidence can be accepted without a JUnit offer in new and existing configs
+  ---
+  duration_ms: 44.986583
+  type: 'test'
+  ...
+# (node:423) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: run store persists runs, phases, review cycles, and artifacts
+ok 365 - run store persists runs, phases, review cycles, and artifacts
+  ---
+  duration_ms: 139.177375
+  type: 'test'
+  ...
+# Subtest: run store fails clearly for unknown runs
+ok 366 - run store fails clearly for unknown runs
+  ---
+  duration_ms: 48.054541
+  type: 'test'
+  ...
+# Subtest: run stores opened by parallel runs keep each other's writes
+ok 367 - run stores opened by parallel runs keep each other's writes
+  ---
+  duration_ms: 114.721791
+  type: 'test'
+  ...
+# Subtest: read-only run store sees in-progress writes and rejects its own writes
+ok 368 - read-only run store sees in-progress writes and rejects its own writes
+  ---
+  duration_ms: 45.140834
+  type: 'test'
+  ...
+# Subtest: read-only run store treats a repository without a database as having no runs
+ok 369 - read-only run store treats a repository without a database as having no runs
+  ---
+  duration_ms: 2.657375
+  type: 'test'
+  ...
+# Subtest: run store records the process that runs each run
+ok 370 - run store records the process that runs each run
+  ---
+  duration_ms: 34.303375
+  type: 'test'
+  ...
+# Subtest: a run is interrupted only when it never finished and its process is gone
+ok 371 - a run is interrupted only when it never finished and its process is gone
+  ---
+  duration_ms: 0.277917
+  type: 'test'
+  ...
+# Subtest: a process owned by another user counts as alive
+ok 372 - a process owned by another user counts as alive
+  ---
+  duration_ms: 0.079833
+  type: 'test'
+  ...
+# Subtest: a database from an earlier version gains a pid column and keeps its runs
+ok 373 - a database from an earlier version gains a pid column and keeps its runs
+  ---
+  duration_ms: 46.319375
+  type: 'test'
+  ...
+1..373
+# tests 373
+# suites 0
+# pass 373
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8818.162005
+stderr:
+npm notice
+npm notice New major version of npm available! 10.9.9 -> 12.2.3
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+npm notice To update run: npm install -g npm@12.2.3
+npm notice
