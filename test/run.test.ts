@@ -2587,3 +2587,31 @@ test("runAgentCage reports Claude usage limits with the reset time in its summar
     lastPhase: "implement",
   });
 });
+
+test("runAgentCage publishes changed-line coverage in Verification", async () => {
+  const cwd = await createProject(`
+verify:
+  - mkdir -p coverage && printf 'SF:/workspace/src/app.js\\nDA:1,1\\nend_of_record\\n' > coverage/lcov.info
+reports:
+  lcov: ["coverage/lcov.info"]
+`);
+  const repoDir = await createGitRepo({ "src/app.js": "export const state = 'old';\n" });
+  try {
+    const result = await runWithJunitVerify({
+      cwd,
+      repoDir,
+      runId: "run-coverage",
+      agentSteps: [
+        async () => {
+          await writeFile(join(repoDir, "src/app.js"), "export const state = 'new';\n");
+        },
+      ],
+    });
+    assert.match(result.prBody, /Changed-line coverage: 1 of 1 lines \(100%\)/);
+    const prompt = await readFile(join(result.runDir, "review-prompt-0.md"), "utf8");
+    assert.match(prompt, /Changed-line coverage: 1 of 1 lines/);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+    await rm(repoDir, { recursive: true, force: true });
+  }
+});
