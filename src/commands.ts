@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { cleanupEvidenceBranches } from "./cleanup-evidence.js";
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { checkIssue, type IssueCheckResult } from "./check.js";
@@ -28,6 +29,8 @@ export type CliDependencies = {
   reviseAgentCagePullRequest?: typeof reviseAgentCagePullRequest;
   setupProject?: typeof setupProject;
   doctorProject?: typeof doctorProject;
+  cleanupManagedDockerResources?: typeof cleanupManagedDockerResources;
+  cleanupEvidenceBranches?: typeof cleanupEvidenceBranches;
 };
 
 export function createCli(dependencies: CliDependencies = {}): Command {
@@ -316,10 +319,31 @@ export function createCli(dependencies: CliDependencies = {}): Command {
     .command("cleanup")
     .description("Remove stale Docker resources managed by Agent Cage.")
     .option("--all", "remove all managed Docker resources, including active ones")
-    .action(async (options: { all?: boolean }) => {
-      const report = await cleanupManagedDockerResources({ all: options.all === true });
-      console.log(formatCleanupReport(report, createColorizer(process.stdout)));
-    });
+    .option("--evidence", "also delete stale evidence branches on GitHub")
+    .option(
+      "--repo <owner/name>",
+      "override the current origin repository for evidence cleanup",
+    )
+    .option("--yes", "delete selected evidence branches without prompting")
+    .action(
+      async (options: {
+        all?: boolean;
+        evidence?: boolean;
+        repo?: string;
+        yes?: boolean;
+      }) => {
+        const report = await (
+          dependencies.cleanupManagedDockerResources ?? cleanupManagedDockerResources
+        )({ all: options.all === true });
+        console.log(formatCleanupReport(report, createColorizer(process.stdout)));
+        if (options.evidence === true) {
+          await (dependencies.cleanupEvidenceBranches ?? cleanupEvidenceBranches)({
+            ...(options.repo === undefined ? {} : { repo: options.repo }),
+            yes: options.yes === true,
+          });
+        }
+      },
+    );
 
   return program;
 }
