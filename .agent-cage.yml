@@ -4,5 +4,13 @@ setup:
 verify:
   - npm test
 
+agent:
+  implement:
+    provider: claude
+    model: claude-sonnet-5-5
+  review:
+    provider: codex
+    model: gpt-6-luna
+
 git:
   base: main
