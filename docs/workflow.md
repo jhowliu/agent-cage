@@ -568,3 +568,16 @@ npm run format
 - no-op diff
 
 The QA harness avoids real Codex, Docker, GitHub, and Linear calls by using injected fake runners.
+
+When a GitHub run fails after fetching the issue, Agent Cage posts one failure
+comment on the issue (or on the pull request for `agent-cage revise`). It includes
+the failure code and a one-line reason, up to 20 failed tests from the last
+verify's JUnit reports, and a link to the evidence branch when published. When
+that verify collected report files, Agent Cage also pushes the evidence branch
+on failure. In GitHub Actions, the comment links to the Actions run using
+`GITHUB_SERVER_URL`, `GITHUB_REPOSITORY`, and `GITHUB_RUN_ID`.
+
+Linear issues receive no failure comment. Comment API failures are logged and do
+not change the run's result or failure code. The Actions workflow keeps its
+blocked label but delegates failure comments to the runner. Run `agent-cage setup`
+to regenerate an existing workflow with this behavior.

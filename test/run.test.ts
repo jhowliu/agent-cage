@@ -2410,3 +2410,149 @@ agent:
     await rm(repoDir, { recursive: true, force: true });
   }
 });
+
+for (const mode of ["docker", "direct"] as const) {
+  for (const scenario of ["github", "linear", "comment-error", "revision"] as const) {
+    test(`failed ${mode} run reports evidence: ${scenario}`, async () => {
+      const cwd = await createProject(`
+verify:
+  - mkdir -p reports && printf '<testsuite><testcase classname="Calc" name="adds"><failure message="wrong result"/></testcase></testsuite>' > reports/junit.xml && printf PNG > reports/shot.png && exit 1
+reports:
+  junit: ["reports/*.xml"]
+  evidence: ["reports/*.png"]
+agent:
+  max_iterations: 1
+`);
+      const repoDir = await createGitRepo({});
+      const host = createHostShellRunner(repoDir);
+      const comments: string[][] = [];
+      let pushes = 0;
+      const shell: ShellRunner = {
+        async run(command, options) {
+          if (
+            command.includes("git clone") ||
+            command.includes("git fetch origin") ||
+            command.includes("codex exec")
+          )
+            return commandResult();
+          if (command.includes("git push origin")) {
+            pushes += 1;
+            assert.match(
+              command,
+              /refs\/heads\/agent-cage\/evidence\/run-failure-comment/,
+            );
+            assert.ok(options?.input?.includes("reports/shot.png"));
+            return commandResult("a".repeat(40));
+          }
+          return await host.run(command, options);
+        },
+      };
+      const previous = {
+        server: process.env.GITHUB_SERVER_URL,
+        repo: process.env.GITHUB_REPOSITORY,
+        id: process.env.GITHUB_RUN_ID,
+      };
+      process.env.GITHUB_SERVER_URL = "https://github.com";
+      process.env.GITHUB_REPOSITORY = repo.fullName;
+      process.env.GITHUB_RUN_ID = "123";
+      try {
+        const dependencies: RunAgentCageDependencies = {
+          executionMode: mode,
+          generateRunId: () => "run-failure-comment",
+          readEnv: async () => ({ GITHUB_TOKEN: "token-value" }),
+          findCodexAuthFile: async () => null,
+          fetchIssueContext: async () => ({
+            ...issue,
+            source: scenario === "linear" ? "linear" : "github",
+          }),
+          fetchRevision: async () => ({
+            pullRequest: {
+              url: "https://github.com/jhowliu/agent-cage/pull/40",
+              number: 40,
+              repo,
+              title: issue.title,
+              body: "",
+              headBranch: "agent-cage/test",
+              baseBranch: "main",
+              agentCageRunId: "old",
+              issueUrl: issue.url,
+            },
+            feedback: [],
+            feedbackThrough: "2026-11-12T00:00:00Z",
+          }),
+          resolveTargetRepo: async () => repoResolution,
+          createAuthenticatedRepo: () => ({
+            repo,
+            cloneUrl: "https://github.com/jhowliu/agent-cage.git",
+            redactedCloneUrl: "https://github.com/jhowliu/agent-cage.git",
+          }),
+          createDockerSandbox: () => fakeSandbox([]),
+          createShellRunner: () => shell,
+          createHostWorkspace: async () => ({
+            workspacePath: repoDir,
+            cleanup: async () => undefined,
+          }),
+          createHostShellRunner: () => shell,
+          failureGh: {
+            async run(args) {
+              comments.push(args);
+              if (scenario === "comment-error") throw new Error("API unavailable");
+              return commandResult();
+            },
+          },
+        };
+        const result =
+          scenario === "revision"
+            ? await reviseAgentCagePullRequest(
+                { cwd, prUrl: "https://github.com/jhowliu/agent-cage/pull/40" },
+                dependencies,
+              )
+            : await runAgentCage({ cwd, issueUrl: issue.url }, dependencies);
+        assert.equal(result.status, "failed");
+        assert.equal(result.failureCode, "verify_failed");
+        const events = await readRunEvents(cwd, result.runId);
+        const terminal = events.filter((event) => event.type === "run.finished");
+        assert.equal(terminal.length, 1);
+        assert.equal(events.at(-1)?.type, "run.finished");
+        const replay = await replayRunEventJournal(
+          join(cwd, ".agent-cage", "runs", result.runId, "events.ndjson"),
+        );
+        assert.equal(replay.status, "failed");
+        assert.equal(replay.failureCode, "verify_failed");
+        assert.equal(pushes, 1);
+        assert.equal(comments.length, scenario === "linear" ? 0 : 1);
+        if (scenario !== "linear") {
+          const body = comments[0]?.at(-1) ?? "";
+          assert.equal(comments[0]?.[0], scenario === "revision" ? "pr" : "issue");
+          assert.equal(
+            comments[0]?.[2],
+            scenario === "revision"
+              ? "https://github.com/jhowliu/agent-cage/pull/40"
+              : issue.url,
+          );
+          assert.match(body, /verify_failed.*Exceeded max_iterations/);
+          assert.match(body, /Calc > adds: wrong result/);
+          assert.match(
+            body,
+            /https:\/\/github.com\/jhowliu\/agent-cage\/tree\/agent-cage\/evidence\/run-failure-comment/,
+          );
+          assert.match(
+            body,
+            /https:\/\/github.com\/jhowliu\/agent-cage\/actions\/runs\/123/,
+          );
+        }
+      } finally {
+        for (const [key, value] of Object.entries({
+          GITHUB_SERVER_URL: previous.server,
+          GITHUB_REPOSITORY: previous.repo,
+          GITHUB_RUN_ID: previous.id,
+        })) {
+          if (value === undefined) delete process.env[key];
+          else process.env[key] = value;
+        }
+        await rm(cwd, { recursive: true, force: true });
+        await rm(repoDir, { recursive: true, force: true });
+      }
+    });
+  }
+}

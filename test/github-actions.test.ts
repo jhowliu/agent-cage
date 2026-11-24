@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import { parse } from "yaml";
 import {
   generateGitHubActionsWorkflow,
@@ -108,7 +109,10 @@ test("normalizes all state labels and reports results and artifacts", () => {
   }
 
   assert.match(step(workflow, "Report success").run ?? "", /prUrl/);
-  assert.match(step(workflow, "Report failure").run ?? "", /failureCode/);
+  assert.doesNotMatch(
+    step(workflow, "Report failure").run ?? "",
+    /gh issue comment|failureCode/,
+  );
   const artifact = step(workflow, "Upload run artifacts");
   assert.equal(artifact.if, "always()");
   assert.match(artifact.with?.path ?? "", /agent-cage-result\.json/);
@@ -190,4 +194,11 @@ test("a Claude-only workflow does not require OpenAI credentials", () => {
     /@openai\/codex/,
   );
   assert.doesNotMatch(JSON.stringify(workflow), /OPENAI_API_KEY/);
+});
+
+test("repository workflow keeps the blocked label without a failure comment", async () => {
+  const content = await readFile(".github/workflows/issue-run.yml", "utf8");
+  const failure = content.split("- name: Report failure")[1]?.split("- name:")[0] ?? "";
+  assert.doesNotMatch(failure, /gh issue comment/);
+  assert.match(failure, /--add-label 'agent-cage:blocked'/);
 });

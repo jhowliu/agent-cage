@@ -1,3 +1,5 @@
+import { execaGhRunner, type CommandRunner } from "./publish.js";
+import { publishEvidence } from "./run/evidence.js";
 import { resolve } from "node:path";
 import { agentShellCommand, type AgentAssignments } from "./agent/providers.js";
 import {
@@ -164,6 +166,7 @@ export type RunWorkflowInput = {
   runIndependentReview?: typeof runIndependentReview;
   publishSuccessfulRun?: typeof publishSuccessfulRun;
   publishRevision?: typeof publishRevision;
+  failureGh?: CommandRunner;
   onProgress?: (event: RunProgressEvent) => void;
   onEvent?: RunEventSink;
 };
@@ -191,6 +194,11 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunAgentCage
     commandMs: context.config.timeouts.command_minutes * 60_000,
     idleMs: context.config.timeouts.idle_minutes * 60_000,
     deadlineAt: Date.now() + context.config.timeouts.total_minutes * 60_000,
+  };
+  const reportsState: { last: ReportCollection | null } = { last: null };
+  const failureShell: { current: ShellRunner | null } = { current: null };
+  const registerFailureShell = (runner: ShellRunner): void => {
+    failureShell.current = runner;
   };
   let sandbox: DockerSandbox | null = null;
   let shell: ShellRunner | null = null;
@@ -237,6 +245,7 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunAgentCage
         createHostWorkspace: makeHostWorkspace,
         createHostShellRunner: makeHostShellRunner,
         shellTimeouts,
+        registerFailureShell,
         registerWorkspace: (workspace) => {
           hostWorkspace = workspace;
         },
@@ -252,6 +261,7 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunAgentCage
         makeShellRunner,
         makeComposeProject,
         shellTimeouts,
+        registerFailureShell,
         registerCompose: (project) => {
           compose = project;
         },
@@ -301,6 +311,9 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunAgentCage
       review,
       publish,
       revise,
+      onReports: (reports) => {
+        reportsState.last = reports;
+      },
     });
 
     return runResult;
@@ -320,6 +333,64 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunAgentCage
       }
     }
     await journal.recordFailure(failureCode, error);
+    // Reporting is best effort and must preserve the original result.
+    try {
+      const evidence =
+        failureShell.current !== null &&
+        reportsState.last !== null &&
+        reportsState.last.files.length > 0
+          ? await publishEvidence({
+              shell: failureShell.current,
+              options: context.credentials.command("publish"),
+              runId: context.runId,
+              repo: context.repoResolution.repo.fullName,
+              issueUrl: context.issue.url,
+              artifactPath: (name) => journal.artifactPath(name),
+              reports: reportsState.last,
+              authorName: context.config.git.author_name,
+              authorEmail: context.config.git.author_email,
+            })
+          : null;
+      if (evidence?.status === "failed")
+        console.error(redactor(`Failure evidence: ${evidence.reason}`));
+      if (context.issue.source === "github") {
+        const junit = await readJunitReports(
+          (name) => journal.artifactPath(name),
+          reportsState.last,
+        );
+        const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
+        const body = redactor(
+          [
+            `Agent Cage failed (\`${failureCode}\`): ${formatError(error).split(/\r?\n/)[0] ?? "Run failed"}`,
+            formatJunitFailures(junit),
+            evidence?.status === "published"
+              ? `[Evidence branch](https://github.com/${evidence.repo}/tree/${evidence.branch})`
+              : null,
+            GITHUB_SERVER_URL && GITHUB_REPOSITORY && GITHUB_RUN_ID
+              ? `[Actions run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})`
+              : null,
+          ]
+            .filter((line) => line !== null)
+            .join("\n\n"),
+        );
+        const result = await (input.failureGh ?? execaGhRunner).run(
+          [
+            context.revision === null ? "issue" : "pr",
+            "comment",
+            context.revision?.pullRequest.url ?? context.issue.url,
+            "--body",
+            body,
+          ],
+          { cwd: context.cwd, env: context.credentials.command("publish").env },
+        );
+        if (result.exitCode !== 0)
+          throw new Error(result.stderr || result.stdout || "Comment API failed");
+      }
+    } catch (reportError) {
+      console.error(
+        redactor(`Failed to report run failure: ${formatError(reportError)}`),
+      );
+    }
 
     const runResult: RunAgentCageResult = {
       runId: context.runId,
@@ -351,6 +422,7 @@ async function provisionDockerSandbox(input: {
   registerCompose: (project: ComposeProject) => void;
   registerSandbox: (sandbox: DockerSandbox) => void;
   shellTimeouts: ShellTimeouts;
+  registerFailureShell: (shell: ShellRunner) => void;
 }): Promise<ShellRunner> {
   const { context, journal, redactor } = input;
   const runtimeDockerfile = context.config.runtime.dockerfile;
@@ -421,9 +493,15 @@ async function provisionDockerSandbox(input: {
 
   const sandbox = input.createSandbox(sandboxOptions);
   input.registerSandbox(sandbox);
-  const shell = journal.instrumentShell(
-    input.makeShellRunner(sandbox, {}, input.sink, input.shellTimeouts),
+  // Failure evidence is published after the journal has closed its final stage.
+  const rawShell = input.makeShellRunner(
+    sandbox,
+    {},
+    input.sink,
+    input.shellTimeouts,
   );
+  input.registerFailureShell(rawShell);
+  const shell = journal.instrumentShell(rawShell);
 
   await journal.setRunStatus("cloning");
   await journal.runPhase("cloning", async () => {
@@ -451,6 +529,7 @@ async function provisionDirectWorkspace(input: {
   createHostShellRunner: typeof createHostShellRunner;
   registerWorkspace: (workspace: HostWorkspace) => void;
   shellTimeouts: ShellTimeouts;
+  registerFailureShell: (shell: ShellRunner) => void;
 }): Promise<ShellRunner> {
   const { context, journal, redactor } = input;
 
@@ -459,14 +538,14 @@ async function provisionDirectWorkspace(input: {
   const cloneCredentials = runtimeCommandCredentials("clone", context);
   const workspace = await input.createHostWorkspace(context.runId);
   input.registerWorkspace(workspace);
-  const shell = journal.instrumentShell(
-    input.createHostShellRunner(
-      workspace.workspacePath,
-      {},
-      input.sink,
-      input.shellTimeouts,
-    ),
+  const rawShell = input.createHostShellRunner(
+    workspace.workspacePath,
+    {},
+    input.sink,
+    input.shellTimeouts,
   );
+  input.registerFailureShell(rawShell);
+  const shell = journal.instrumentShell(rawShell);
 
   await journal.setRunStatus("cloning");
   await journal.runPhase("cloning", async () =>
@@ -540,6 +619,7 @@ async function runImplementationLoop(input: {
   review: typeof runIndependentReview;
   publish: typeof publishSuccessfulRun;
   revise: typeof publishRevision;
+  onReports: (reports: ReportCollection | null) => void;
 }): Promise<RunAgentCageResult> {
   const feedback: string[] = [];
   let reviewCycle = 0;
@@ -612,6 +692,7 @@ async function runImplementationLoop(input: {
       commands: input.context.config.verify,
       reports: input.context.config.reports,
       iteration,
+      onReports: input.onReports,
       redactor: input.redactor,
       commandOptions: runtimeCommandCredentials("verify", input.context),
     });
@@ -925,10 +1006,12 @@ async function runVerificationCommands(input: {
   shell: ShellRunner;
   commands: string[];
   reports: ReportsConfig;
+  onReports: (reports: ReportCollection | null) => void;
   iteration: number;
   redactor: (input: string) => string;
   commandOptions?: DockerCommandOptions | undefined;
 }): Promise<VerificationResult> {
+  input.onReports(null);
   const items: string[] = [];
   const phase = await input.journal.startPhase("verify");
   const logs: string[] = [];
@@ -952,6 +1035,7 @@ async function runVerificationCommands(input: {
       config: reports,
       iteration: input.iteration,
     });
+    input.onReports(collection);
     logs.push(formatReportSummary(collection));
     return collection;
   };
