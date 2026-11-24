@@ -8,6 +8,7 @@ import {
 import { codexConfigModel, codexFailureCode } from "../src/agent/codex.js";
 import {
   agentFailureCode,
+  agentProviders,
   agentShellCommand,
   extractAgentResult,
 } from "../src/agent/providers.js";
@@ -22,10 +23,9 @@ test("Claude implementation runs headless with permissions bypassed and streamin
   const command = claudeExecCommand({
     access: "workspace-write",
     model: "claude-opus-5-5",
-    prompt: "Implement it",
   });
 
-  assert.ok(command.startsWith("DISABLE_AUTOUPDATER=1 claude -p 'Implement it' "));
+  assert.ok(command.startsWith("DISABLE_AUTOUPDATER=1 claude -p '--model' "));
   assert.match(command, /'--model' 'claude-opus-5-5'/);
   assert.match(command, /'--output-format' 'stream-json' '--verbose'/);
   assert.match(command, /'--dangerously-skip-permissions'/);
@@ -36,11 +36,10 @@ test("Claude review is limited to read-only tools and a JSON schema", () => {
   const command = claudeExecCommand({
     access: "read-only",
     model: "claude-opus-5-5",
-    prompt: "Review it",
     outputSchema: schema,
   });
 
-  assert.ok(command.startsWith("DISABLE_AUTOUPDATER=1 claude -p 'Review it' "));
+  assert.ok(command.startsWith("DISABLE_AUTOUPDATER=1 claude -p '--model' "));
   assert.match(
     command,
     /'--json-schema' '\{"type":"object","required":\["decision"\]\}'/,
@@ -52,12 +51,12 @@ test("Claude review is limited to read-only tools and a JSON schema", () => {
 
 test("Codex commands keep the sandbox flag in Docker mode and bypass it in direct mode", () => {
   const codex = { provider: "codex", model: "gpt-5.4-mini" } as const;
-  const docker = agentShellCommand(codex, {
+  const { command: docker } = agentShellCommand(codex, {
     access: "workspace-write",
     prompt: "Implement it",
     executionMode: "docker",
   });
-  const direct = agentShellCommand(codex, {
+  const { command: direct } = agentShellCommand(codex, {
     access: "workspace-write",
     prompt: "Implement it",
     executionMode: "direct",
@@ -69,7 +68,7 @@ test("Codex commands keep the sandbox flag in Docker mode and bypass it in direc
 });
 
 test("Codex review writes the output schema before running read-only", () => {
-  const command = agentShellCommand(
+  const { command } = agentShellCommand(
     { provider: "codex", model: "gpt-5.4-mini" },
     {
       access: "read-only",
@@ -85,6 +84,32 @@ test("Codex review writes the output schema before running read-only", () => {
   );
   assert.match(command, /--sandbox 'read-only'/);
   assert.match(command, /--output-schema '\/tmp\/agent-cage-review-output-schema\.json'/);
+});
+
+test("agent commands take the prompt on stdin, never as an argument", () => {
+  // A review prompt with a large diff passed the 128 KiB limit Linux puts on
+  // one argument, so `sh -lc <command>` failed with "argument list too long".
+  const prompt = `Review it ${"x".repeat(200 * 1024)} 'quoted'`;
+  for (const provider of agentProviders) {
+    for (const access of ["workspace-write", "read-only"] as const) {
+      const input =
+        access === "read-only"
+          ? { access, prompt, executionMode: "docker" as const, outputSchema: schema }
+          : { access, prompt, executionMode: "docker" as const };
+      const agentCommand = agentShellCommand({ provider, model: "m" }, input);
+
+      assert.equal(agentCommand.stdin, prompt);
+      assert.ok(agentCommand.command.length < 2048, `${provider} ${access}`);
+      assert.doesNotMatch(agentCommand.command, /Review it/);
+    }
+  }
+  assert.match(
+    agentShellCommand(
+      { provider: "codex", model: "m" },
+      { access: "workspace-write", prompt, executionMode: "docker" },
+    ).command,
+    / -$/,
+  );
 });
 
 test("extractClaudeResult prefers structured output over result text", () => {

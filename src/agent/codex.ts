@@ -7,7 +7,6 @@ export function codexExecCommand(input: {
   model: string;
   sandbox: "read-only" | "workspace-write";
   outputSchemaPath?: string | undefined;
-  prompt: string;
   bypassSandbox?: boolean | undefined;
 }): string {
   const args = ["codex exec", "--model", shellQuote(input.model)];
@@ -27,7 +26,8 @@ export function codexExecCommand(input: {
     args.push("--output-schema", shellQuote(input.outputSchemaPath));
   }
 
-  args.push(shellQuote(input.prompt));
+  // `-` reads the prompt from stdin; see AgentCommand.
+  args.push("-");
 
   return args.join(" ");
 }

@@ -46,7 +46,11 @@ import {
   prepareReportPaths,
   type ReportCollection,
 } from "./run/reports.js";
-import { buildImplementationPrompt, buildTestFirstPrompt } from "./run/prompts.js";
+import {
+  buildImplementationPrompt,
+  buildTestFirstPrompt,
+  formatPassedCommandForReview,
+} from "./run/prompts.js";
 import {
   checkGreen,
   checkRed,
@@ -584,7 +588,7 @@ async function runImplementationLoop(input: {
         {
           role: "implement",
           agent: input.context.agents.implement,
-          command: agentShellCommand(input.context.agents.implement, {
+          agentCommand: agentShellCommand(input.context.agents.implement, {
             access: "workspace-write",
             prompt,
             executionMode: input.context.executionMode,
@@ -791,7 +795,7 @@ async function runRedStep(
         {
           role: "implement",
           agent: input.context.agents.implement,
-          command: agentShellCommand(input.context.agents.implement, {
+          agentCommand: agentShellCommand(input.context.agents.implement, {
             access: "workspace-write",
             prompt,
             executionMode: input.context.executionMode,
@@ -927,6 +931,7 @@ async function runVerificationCommands(input: {
   const items: string[] = [];
   const phase = await input.journal.startPhase("verify");
   const logs: string[] = [];
+  const reviewLines: string[] = [];
   const reports = hasReports(input.reports) ? input.reports : null;
   const recordCommands = async (status: "passed" | "failed"): Promise<void> => {
     await input.journal.recordVerificationCommands({
@@ -997,6 +1002,7 @@ async function runVerificationCommands(input: {
     }
 
     items.push(`\`${command}\` passed`);
+    reviewLines.push(formatPassedCommandForReview(command, result));
   }
 
   let collection: ReportCollection | null;
@@ -1013,7 +1019,7 @@ async function runVerificationCommands(input: {
 
   return {
     passed: true,
-    summary,
+    reviewSummary: input.redactor(reviewLines.join("\n\n")),
     items,
     reports: collection,
   };

@@ -31,9 +31,18 @@ import { formatReviewIssueContext } from "./prompts.js";
 import { formatRedGreenSummary, type RedGreenReport } from "./red-green.js";
 import type { ReportCollection } from "./reports.js";
 
-/** `reports` is null when the config declares no report files. */
+/**
+ * `reviewSummary` is what the review agent sees of a passed verify: each
+ * command with the last lines of its output, not the full log in verify.log.
+ * `reports` is null when the config declares no report files.
+ */
 export type VerificationResult =
-  | { passed: true; summary: string; items: string[]; reports: ReportCollection | null }
+  | {
+      passed: true;
+      reviewSummary: string;
+      items: string[];
+      reports: ReportCollection | null;
+    }
   | { passed: false; feedback: string; reports: ReportCollection | null };
 
 type RunGatePhaseBody = () => Promise<string | undefined>;
@@ -122,7 +131,7 @@ export async function runReviewGate(input: {
       input.redGreen === null ? undefined : formatRedGreenSummary(input.redGreen);
     const reviewPrompt = buildReviewPrompt({
       issueContext: reviewIssueContext,
-      verificationSummary: input.verification.summary,
+      verificationSummary: input.verification.reviewSummary,
       redGreenSummary,
       reviewPolicyStatus,
       resultMetadata,
@@ -140,7 +149,7 @@ export async function runReviewGate(input: {
       maxReviewCycles: input.context.config.agent.max_review_cycles,
       issueContext: reviewIssueContext,
       diff: input.diff,
-      verificationSummary: input.verification.summary,
+      verificationSummary: input.verification.reviewSummary,
       redGreenSummary,
       reviewPolicyStatus,
       resultMetadata,

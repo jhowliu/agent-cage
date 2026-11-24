@@ -224,6 +224,22 @@ test("host shell runner surfaces non-zero exit codes without throwing", async ()
   });
 });
 
+test("host shell runner writes input to stdin and closes stdin without it", async () => {
+  await withWorkspace(async (workspacePath) => {
+    const runner = createHostShellRunner(workspacePath);
+    const prompt = "x".repeat(200 * 1024);
+
+    const piped = await runner.run("wc -c", { input: prompt });
+    // `cat` would wait forever on an open stdin.
+    const closed = await runner.run("cat", { timeoutMs: 5000 });
+
+    assert.equal(piped.exitCode, 0);
+    assert.equal(piped.stdout.trim(), String(prompt.length));
+    assert.equal(closed.exitCode, 0);
+    assert.equal(closed.stdout, "");
+  });
+});
+
 test("host shell runner merges base env with per-command env", async () => {
   await withWorkspace(async (workspacePath) => {
     const runner = createHostShellRunner(workspacePath, { BASE_VAR: "base" });
@@ -350,7 +366,6 @@ test("codex exec uses the sandbox flag by default", () => {
   const command = codexExecCommand({
     model: "gpt",
     sandbox: "workspace-write",
-    prompt: "do it",
   });
 
   assert.match(command, /--sandbox 'workspace-write'/);
@@ -361,7 +376,6 @@ test("codex exec bypasses the sandbox in direct mode", () => {
   const command = codexExecCommand({
     model: "gpt",
     sandbox: "workspace-write",
-    prompt: "do it",
     bypassSandbox: true,
   });
 

@@ -17,18 +17,16 @@ export const claudeReviewAllowedTools = [
 const claudeEditTools = ["Edit", "Write", "NotebookEdit"] as const;
 
 export type ClaudeCommandInput =
-  | { access: "workspace-write"; model: string; prompt: string }
+  | { access: "workspace-write"; model: string }
   | {
       access: "read-only";
       model: string;
-      prompt: string;
       outputSchema: Record<string, unknown>;
     };
 
 /**
- * Options after `-p <prompt>`. The prompt must come first because
- * `--allowedTools`/`--disallowedTools` are variadic and would otherwise
- * swallow a trailing positional prompt.
+ * Options after `-p`. The prompt comes on stdin, so the variadic
+ * `--allowedTools`/`--disallowedTools` have no positional prompt to swallow.
  */
 export function claudeOptionArgs(input: ClaudeCommandInput): string[] {
   // stream-json keeps output flowing during long turns, so the idle timeout
@@ -58,10 +56,10 @@ export function claudeOptionArgs(input: ClaudeCommandInput): string[] {
   }
 }
 
+/** `claude -p` with no prompt argument reads the prompt from stdin; see AgentCommand. */
 export function claudeExecCommand(input: ClaudeCommandInput): string {
   return [
     "DISABLE_AUTOUPDATER=1 claude -p",
-    shellQuote(input.prompt),
     ...claudeOptionArgs(input).map(shellQuote),
   ].join(" ");
 }

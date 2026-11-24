@@ -174,6 +174,21 @@ test("dockerRunArgs can mount only the Codex auth file for OAuth fallback", () =
   assert.equal(joinedArgs.includes("secret"), false);
 });
 
+test("dockerRunArgs keeps stdin open only for commands that read input", () => {
+  const base = {
+    image: defaultSandboxImage,
+    networkName: "agent-cage-run-1",
+    volumeName: "agent-cage-run-1-workspace",
+    workspacePath: "/workspace",
+    labels: {},
+    env: {},
+    command: "codex exec -",
+  };
+
+  assert.equal(dockerRunArgs({ ...base, interactive: true })[2], "--interactive");
+  assert.equal(dockerRunArgs(base).includes("--interactive"), false);
+});
+
 test("dockerRunArgs omits credential env and OAuth mount for setup and verify commands", () => {
   for (const command of ["npm install", "npm test"]) {
     const args = dockerRunArgs({

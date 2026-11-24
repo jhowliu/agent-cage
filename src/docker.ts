@@ -36,6 +36,12 @@ export type DockerCommandOptions = {
   onData?: ((chunk: string) => void) | undefined;
   timeoutMs?: number | undefined;
   idleTimeoutMs?: number | undefined;
+  /**
+   * Written to the command's stdin, which is then closed. Without it the
+   * command gets no stdin. Agent prompts go here: as an argument they fail
+   * past Linux's 128 KiB limit for a single argument.
+   */
+  input?: string | undefined;
 };
 
 export type DockerSandbox = {
@@ -382,12 +388,15 @@ type DockerRunArgsInput = {
   env: Record<string, string>;
   codexAuthFilePath?: string | undefined;
   command: string;
+  /** Keeps stdin open so the command can read DockerCommandOptions.input. */
+  interactive?: boolean | undefined;
 };
 
 export function dockerRunArgs(input: DockerRunArgsInput): string[] {
   return [
     "run",
     "--rm",
+    ...interactiveArgs(input.interactive),
     ...labelArgs(input.labels),
     "--network",
     input.networkName,
@@ -411,6 +420,7 @@ export type DockerOneShotArgsInput = {
   env: Record<string, string>;
   codexAuthFilePath?: string | undefined;
   command: string;
+  interactive?: boolean | undefined;
 };
 
 /**
@@ -422,6 +432,7 @@ export function dockerOneShotArgs(input: DockerOneShotArgsInput): string[] {
   return [
     "run",
     "--rm",
+    ...interactiveArgs(input.interactive),
     ...labelArgs({}),
     "--user",
     "agent",
@@ -435,6 +446,10 @@ export function dockerOneShotArgs(input: DockerOneShotArgsInput): string[] {
       input.env,
     ),
   ];
+}
+
+function interactiveArgs(interactive: boolean | undefined): string[] {
+  return interactive === true ? ["--interactive"] : [];
 }
 
 function commandWithAuth(command: string, input: DockerRunArgsInput): string {

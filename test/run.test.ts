@@ -615,7 +615,19 @@ verify:
     assert.match(implementationPrompt, /native Codex AGENTS\.md/);
     assert.doesNotMatch(implementationPrompt, /Do not prompt-inject/);
     assert.doesNotMatch(reviewIssueContext, /Do not prompt-inject/);
-    assert.match(reviewPrompt, /Verification summary:/);
+    // The reviewer sees each passed command with the tail of its output, not
+    // the verify log, and agents get their prompts on stdin.
+    assert.match(reviewPrompt, /Verification results:/);
+    // APP_ENV=test is redacted, so "test" shows as [REDACTED:APP_ENV].
+    assert.match(reviewPrompt, /` passed\.\nstdout:\n {4}\[REDACTED:APP_ENV\]s passed\n/);
+    assert.doesNotMatch(reviewPrompt, /exit code: 0/);
+    assert.match(
+      shell.commandOptions[implementIndex]?.input ?? "",
+      /native Codex AGENTS\.md/,
+    );
+    assert.doesNotMatch(shell.commands[implementIndex] ?? "", /AGENTS\.md/);
+    assert.equal(shell.commandOptions[reviewIndex]?.input, "review");
+    assert.equal(shell.commandOptions[verifyIndex]?.input, undefined);
     assert.match(
       reviewPrompt,
       /Target review policy: present at \.agent-cage\/review-policy\.md/,
@@ -1825,13 +1837,17 @@ agent:
       shell.commands[implementIndex] ?? "",
       /'--dangerously-skip-permissions'/,
     );
-    assert.deepEqual(shell.commandOptions[implementIndex], {
-      env: { CLAUDE_CODE_OAUTH_TOKEN: "claude-value" },
+    assert.deepEqual(shell.commandOptions[implementIndex]?.env, {
+      CLAUDE_CODE_OAUTH_TOKEN: "claude-value",
     });
+    assert.match(
+      shell.commandOptions[implementIndex]?.input ?? "",
+      /^Implement the issue below/,
+    );
     assert.match(shell.commands[reviewIndex] ?? "", /--model 'gpt-5\.4-mini'/);
     assert.match(shell.commands[reviewIndex] ?? "", /--sandbox 'read-only'/);
-    assert.deepEqual(shell.commandOptions[reviewIndex], {
-      env: { OPENAI_API_KEY: "openai-value" },
+    assert.deepEqual(shell.commandOptions[reviewIndex]?.env, {
+      OPENAI_API_KEY: "openai-value",
     });
 
     const implementationPrompt = await readFile(
@@ -2074,11 +2090,13 @@ verify:
       !shell.commands.some((command) => command.endsWith("git diff --binary HEAD")),
     );
 
-    const implementCommand =
-      shell.commands.find((command) => command.includes("codex exec")) ?? "";
-    assert.match(implementCommand, /Revise the pull request below/);
-    assert.match(implementCommand, /Review thread on `src\/app.ts:2`/);
-    assert.match(implementCommand, /Keep the export\./);
+    const implementPrompt =
+      shell.commandOptions[
+        shell.commands.findIndex((command) => command.includes("codex exec"))
+      ]?.input ?? "";
+    assert.match(implementPrompt, /Revise the pull request below/);
+    assert.match(implementPrompt, /Review thread on `src\/app.ts:2`/);
+    assert.match(implementPrompt, /Keep the export\./);
 
     assert.match(
       reviewInputs[0]?.issueContext ?? "",

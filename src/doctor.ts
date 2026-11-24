@@ -57,6 +57,8 @@ export type DoctorCommandOptions = {
   /** Added to the process environment, e.g. credentials a probe forwards to Docker. */
   env?: Record<string, string>;
   timeoutMs?: number;
+  /** Written to the command's stdin, which is then closed. */
+  input?: string;
 };
 
 export type DoctorCommandRunner = (
@@ -204,22 +206,24 @@ async function agentProbeChecks(input: {
       agents: input.agents,
       codexAuthFilePath: input.codexAuthFilePath,
     });
-    const command = `cd "$(mktemp -d)" && git init -q && ${agentShellCommand(agent, {
+    // The prompt goes on stdin as in a run, so the probe checks that path too.
+    const probe = agentShellCommand(agent, {
       access: "read-only",
       prompt: "Set ok to true.",
       executionMode: "docker",
       outputSchema: probeOutputSchema,
-    })}`;
+    });
     const result = await input.runCommand(
       "docker",
       dockerOneShotArgs({
         image,
         env: credentials.env,
         codexAuthFilePath: credentials.codexAuthFilePath,
-        command,
+        command: `cd "$(mktemp -d)" && git init -q && ${probe.command}`,
+        interactive: true,
       }),
       input.cwd,
-      { env: credentials.env, timeoutMs: probeTimeoutMs },
+      { env: credentials.env, timeoutMs: probeTimeoutMs, input: probe.stdin },
     );
     const name = `agent-probe:${roles.join("+")}`;
     const label = `${agent.provider} ${agent.model}`;
@@ -482,6 +486,7 @@ async function defaultCommandRunner(
       reject: false,
       ...(options.env === undefined ? {} : { env: options.env }),
       ...(options.timeoutMs === undefined ? {} : { timeout: options.timeoutMs }),
+      ...(options.input === undefined ? {} : { input: options.input }),
     });
     return {
       // No exit code means the command never started or was killed.

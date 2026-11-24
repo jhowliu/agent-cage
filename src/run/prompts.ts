@@ -1,6 +1,7 @@
 import type { AgentProvider } from "../agent/providers.js";
 import type { RedGreenConfig } from "../config.js";
 import type { IssueContext } from "../issue.js";
+import type { CommandResult } from "../publish.js";
 import { formatLocation, type PullRequestFeedback } from "../pull-request.js";
 import type { RuntimeContext } from "../run-workflow.js";
 
@@ -251,4 +252,34 @@ ${issue.body}
 Comments:
 ${comments}
 `;
+}
+
+/** Lines kept from the end of each output stream; test runners print their totals last. */
+export const reviewOutputTailLines = 15;
+
+/**
+ * A passed verify command as the review agent sees it: the command and the
+ * last lines of its stdout and stderr, where test runners print their totals.
+ * The full output stays in verify.log for people.
+ */
+export function formatPassedCommandForReview(
+  command: string,
+  result: Pick<CommandResult, "stdout" | "stderr">,
+  tailLines: number = reviewOutputTailLines,
+): string {
+  const streams = [
+    ["stdout", result.stdout],
+    ["stderr", result.stderr],
+  ] as const;
+  const sections = streams.flatMap(([name, output]) => {
+    const lines = output.replace(/\s+$/, "").split(/\r?\n/);
+    if (lines.length === 1 && lines[0] === "") return [];
+    const shown = lines.slice(-tailLines);
+    const heading =
+      shown.length === lines.length
+        ? `${name}:`
+        : `Last ${shown.length} of ${lines.length} lines of ${name}:`;
+    return [`${heading}\n${shown.map((line) => `    ${line}`).join("\n")}`];
+  });
+  return [`\`${command}\` passed.`, ...sections].join("\n");
 }

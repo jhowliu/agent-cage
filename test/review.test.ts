@@ -9,6 +9,7 @@ import {
   runIndependentReview,
   type ReviewAgentRunner,
 } from "../src/review.js";
+import { formatPassedCommandForReview } from "../src/run/prompts.js";
 
 function recordingReviewRunner(output: string): ReviewAgentRunner & {
   calls: Array<Parameters<ReviewAgentRunner["run"]>[0]>;
@@ -61,10 +62,40 @@ test("buildReviewPrompt includes read-only instructions and required context", (
   assert.match(prompt, /read-only reviewer/);
   assert.match(prompt, /Do not edit files/);
   assert.match(prompt, /Issue: add review/);
+  assert.match(prompt, /Verification results:\nEvery verify command passed\./);
   assert.match(prompt, /npm test passed/);
   assert.match(prompt, /Target review policy: present/);
   assert.match(prompt, /"runId": "run-1"/);
   assert.match(prompt, /diff --git/);
+});
+
+test("a passed command shows the reviewer only the last lines of each output stream", () => {
+  const tap = Array.from({ length: 40 }, (_, index) => `ok ${index + 1} - case`);
+  const summary = formatPassedCommandForReview(
+    "npm test",
+    {
+      stdout: `${[...tap, "# pass 40", "# fail 0"].join("\n")}\n\n`,
+      stderr: "npm notice\n",
+    },
+    3,
+  );
+
+  assert.equal(
+    summary,
+    [
+      "`npm test` passed.",
+      "Last 3 of 42 lines of stdout:",
+      "    ok 40 - case",
+      "    # pass 40",
+      "    # fail 0",
+      "stderr:",
+      "    npm notice",
+    ].join("\n"),
+  );
+  assert.equal(
+    formatPassedCommandForReview("npm run lint", { stdout: "", stderr: "  \n" }),
+    "`npm run lint` passed.",
+  );
 });
 
 test("buildReviewPrompt explains the red-green results only when the run wrote tests first", () => {

@@ -16,6 +16,7 @@ import {
   agentShellCommand,
   extractAgentResult,
   type AgentAssignment,
+  type AgentCommand,
   type AgentProvider,
   type AgentRole,
 } from "./agent/providers.js";
@@ -132,6 +133,7 @@ export function createDockerShellRunner(
           env: commandEnv,
           codexAuthFilePath: options.codexAuthFilePath,
           command,
+          interactive: options.input !== undefined,
         }),
         {
           // The docker CLI needs PATH, HOME (for its context), and DOCKER_* to
@@ -140,6 +142,7 @@ export function createDockerShellRunner(
           env: { ...pickProcessEnv(dockerClientEnvNames), ...commandEnv },
           onData: options.onData ?? sink?.onData,
           sink,
+          input: options.input,
           ...resolveTimeouts(options, timeouts),
         },
       );
@@ -186,6 +189,7 @@ export function createHostShellRunner(
           env: commandEnv,
           onData: options.onData ?? sink?.onData,
           sink,
+          input: options.input,
           ...resolveTimeouts(options, timeouts),
         },
       );
@@ -200,6 +204,7 @@ type ProcessOptions = {
   shell?: boolean;
   onData: ((chunk: string) => void) | undefined;
   sink: StreamSink | undefined;
+  input: string | undefined;
   timeoutMs: number | undefined;
   idleTimeoutMs: number | undefined;
 };
@@ -232,7 +237,7 @@ async function runProcess(
       ...(options.shell === undefined ? {} : { shell: options.shell }),
       env: options.env,
       extendEnv: false,
-      stdin: "ignore",
+      ...(options.input === undefined ? { stdin: "ignore" } : { input: options.input }),
       reject: false,
       cancelSignal: controller.signal,
       ...(options.timeoutMs === undefined ? {} : { timeout: options.timeoutMs }),
@@ -393,13 +398,13 @@ export function createReviewAgentRunner(
 ): ReviewAgentRunner {
   return {
     async run(input): Promise<string> {
-      const command = agentShellCommand(input.agent, {
+      const { command, stdin } = agentShellCommand(input.agent, {
         access: "read-only",
         prompt: input.prompt,
         executionMode,
         outputSchema: input.outputSchema,
       });
-      const result = await shell.run(command, options);
+      const result = await shell.run(command, { ...options, input: stdin });
 
       if (result.exitCode !== 0) {
         throw agentCommandFailure(
@@ -447,12 +452,14 @@ export function agentCommandFailure(
 /** Like requiredShell, for agent commands: failures carry an agent failure code. */
 export async function requiredAgentShell(
   shell: ShellRunner,
-  input: { role: AgentRole; agent: AgentAssignment; command: string },
+  input: { role: AgentRole; agent: AgentAssignment; agentCommand: AgentCommand },
   redactor: (input: string) => string,
   options?: DockerCommandOptions,
 ): Promise<string> {
-  const result = await shell.run(input.command, options);
-  const log = redactor(formatCommandLog(input.command, result));
+  const { command, stdin } = input.agentCommand;
+  const result = await shell.run(command, { ...options, input: stdin });
+  // The prompt is in its own artifact, so the log keeps only the command.
+  const log = redactor(formatCommandLog(command, result));
 
   if (result.exitCode !== 0) {
     throw agentCommandFailure(input.role, input.agent.provider, log, result);
