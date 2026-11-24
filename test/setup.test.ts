@@ -729,7 +729,10 @@ test("setup keeps the API default Codex model when OPENAI_API_KEY is set", async
   }
 });
 
-type JunitConfig = { verify?: string[]; reports?: { junit?: string[] } };
+type JunitConfig = {
+  verify?: string[];
+  reports?: { junit?: string[]; evidence?: string[] };
+};
 
 async function nodeRepo(
   scripts: Record<string, string>,
@@ -844,5 +847,123 @@ test("setup offers Jest JUnit only when jest-junit is a dependency", async () =>
     assert.match((await readJunitConfig(withReporter)).verify?.[0] ?? "", /jest-junit/);
   } finally {
     await rm(withReporter, { recursive: true, force: true });
+  }
+});
+
+const browserGlobs = [
+  "test-results/**/*.png",
+  "test-results/**/*.webm",
+  "cypress/screenshots/**/*.png",
+  "cypress/videos/**/*.mp4",
+];
+
+function evidencePrompts(asked: string[], answer: boolean): SetupPrompts {
+  return {
+    ...acceptingPrompts(),
+    async confirm(message, defaultValue) {
+      if (message.startsWith("Show screenshots and videos")) {
+        asked.push(message);
+        return answer;
+      }
+      return acceptingPrompts().confirm(message, defaultValue);
+    },
+  };
+}
+
+for (const accept of [true, false]) {
+  test(`setup ${accept ? "accepts" : "declines"} evidence while keeping accepted JUnit`, async () => {
+    const cwd = await nodeRepo(
+      { test: "node --test" },
+      { "@playwright/test": "*", cypress: "*" },
+    );
+    try {
+      const asked: string[] = [];
+      await setup(cwd, {}, evidencePrompts(asked, accept));
+      const config = await readJunitConfig(cwd);
+      assert.equal(asked.length, 1);
+      assert.ok(
+        asked[0]?.startsWith(
+          "Show screenshots and videos in the PR (playwright, cypress)?",
+        ),
+      );
+      for (const glob of browserGlobs) assert.ok(asked[0]?.includes(glob));
+      assert.ok(
+        asked[0]?.includes("Playwright saves screenshots only with use.screenshot"),
+      );
+      assert.ok(asked[0]?.includes("Cypress records video only with video: true."));
+      assert.deepEqual(config.reports?.junit, ["reports/junit.xml"]);
+      assert.deepEqual(config.reports?.evidence, accept ? browserGlobs : []);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+}
+
+test("existing evidence skips the question and survives the JUnit offer", async () => {
+  const cwd = await nodeRepo({ test: "node --test" }, { cypress: "*" });
+  try {
+    await writeFile(
+      join(cwd, ".agent-cage.yml"),
+      'verify: ["npm test"]\nreports:\n  evidence: ["custom/**/*.png"]\n',
+    );
+    const asked: string[] = [];
+    await setup(cwd, {}, evidencePrompts(asked, true));
+    assert.deepEqual(asked, []);
+    const config = await readJunitConfig(cwd);
+    assert.deepEqual(config.reports?.evidence, ["custom/**/*.png"]);
+    assert.deepEqual(config.reports?.junit, ["reports/junit.xml"]);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("setup --yes adds evidence only to a new config", async () => {
+  for (const existing of [false, true]) {
+    const cwd = await nodeRepo(
+      { test: "node --test" },
+      { "@playwright/test": "*", cypress: "*" },
+    );
+    try {
+      if (existing) {
+        await writeFile(
+          join(cwd, ".agent-cage.yml"),
+          'verify: ["npm test"]\nreports:\n  lcov: ["coverage/lcov.info"]\n',
+        );
+      }
+      await setup(cwd, { yes: true, actions: false });
+      const config = await readJunitConfig(cwd);
+      if (existing) {
+        assert.deepEqual(config.reports, { lcov: ["coverage/lcov.info"] });
+        assert.deepEqual(config.verify, ["npm test"]);
+      } else {
+        assert.deepEqual(config.reports?.evidence, browserGlobs);
+        assert.deepEqual(config.reports?.junit, ["reports/junit.xml"]);
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  }
+});
+
+test("evidence can be accepted without a JUnit offer in new and existing configs", async () => {
+  for (const existing of [false, true]) {
+    const cwd = await nodeRepo({ test: "cypress run" }, { cypress: "*" });
+    try {
+      if (existing) {
+        await writeFile(join(cwd, ".agent-cage.yml"), 'verify: ["npm test"]\n');
+      }
+      const asked: string[] = [];
+      await setup(cwd, {}, evidencePrompts(asked, true));
+      assert.equal(asked.length, 1);
+      const config = await readJunitConfig(cwd);
+      assert.deepEqual(config.reports?.evidence, [
+        "cypress/screenshots/**/*.png",
+        "cypress/videos/**/*.mp4",
+      ]);
+      assert.deepEqual(config.reports?.junit, []);
+      assert.deepEqual(config.verify, ["npm test"]);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
   }
 });

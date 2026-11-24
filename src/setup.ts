@@ -46,6 +46,7 @@ import {
   detectProject,
   generateRuntimeDockerfile,
   projectFilesAt,
+  type EvidenceOffer,
   type JunitOffer,
   type ProjectToolchain,
 } from "./project-detect.js";
@@ -84,6 +85,7 @@ type ProjectDefaults = {
   toolchains: ProjectToolchain[];
   redGreen: RedGreenConfig | null;
   junit: JunitOffer | null;
+  evidence: EvidenceOffer | null;
   baseBranch: string;
 };
 
@@ -160,6 +162,14 @@ export async function setupProject(
       throw new Error("At least one verification command is required.");
     }
     const junit = await chooseJunit(existing, detected.junit, chosenVerify, prompt);
+    const evidence = await chooseEvidence(existing, detected.evidence, prompt);
+    const reports =
+      evidence === null
+        ? junit?.reports
+        : {
+            ...(junit?.reports ?? existing?.reports ?? { junit: [], lcov: [] }),
+            evidence,
+          };
     const verify = junit === null ? chosenVerify : junit.verify;
     const redGreen = await chooseRedGreen(existing, detected.redGreen, prompt);
     const runtimeNotices: string[] = [];
@@ -199,7 +209,7 @@ export async function setupProject(
       execution: "docker",
       actions,
       ...(existing === null ? { agent } : {}),
-      ...(junit === null ? {} : { reports: junit.reports }),
+      ...(reports === undefined ? {} : { reports }),
       ...(redGreen === null
         ? {}
         : {
@@ -848,11 +858,11 @@ function toActionsRuntime(
 }
 
 async function detectProjectDefaults(cwd: string): Promise<ProjectDefaults> {
-  const { setup, verify, toolchains, redGreen, junit } = await detectProject(
+  const { setup, verify, toolchains, redGreen, junit, evidence } = await detectProject(
     projectFilesAt(cwd),
   );
   const baseBranch = await detectBaseBranch(cwd);
-  return { setup, verify, toolchains, redGreen, junit, baseBranch };
+  return { setup, verify, toolchains, redGreen, junit, evidence, baseBranch };
 }
 
 /**
@@ -907,6 +917,24 @@ async function chooseJunit(
     ),
     reports: { ...base, junit: [offer.glob] },
   };
+}
+
+async function chooseEvidence(
+  existing: AgentCageConfig | null,
+  offer: EvidenceOffer | null,
+  prompts: SetupPrompts | null,
+): Promise<string[] | null> {
+  if (offer === null || (existing?.reports.evidence.length ?? 0) > 0) return null;
+  if (prompts === null) return existing === null ? offer.globs : null;
+  const details = [...offer.globs, ...offer.notes]
+    .map((line) => `\n  - ${line}`)
+    .join("");
+  return (await prompts.confirm(
+    `Show screenshots and videos in the PR (${offer.tools.join(", ")})?${details}`,
+    true,
+  ))
+    ? offer.globs
+    : null;
 }
 
 async function detectBaseBranch(cwd: string): Promise<string> {
