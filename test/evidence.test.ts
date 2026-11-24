@@ -28,7 +28,20 @@ test("evidence README lists kinds, sizes and skipped reasons and embeds images",
   assert.match(result, /issues\/1/);
   assert.match(result, /!\[shots\/screen.png\]\(\.\/shots\/screen.png\)/);
   assert.match(result, /\[junit.xml\].*junit.*10/);
-  assert.match(result, /large.zip.*too_large/);
+  assert.match(
+    result,
+    /## Skipped files\n\n- large\.zip \(evidence\): too_large\n/,
+  );
+});
+
+test("evidence README omits the skipped files heading when nothing was skipped", () => {
+  const result = formatEvidenceReadme({
+    runId: "run-1",
+    issueUrl: "https://github.com/o/r/issues/1",
+    files: [...files],
+    skipped: [],
+  });
+  assert.doesNotMatch(result, /Skipped files/);
 });
 
 test("evidence uses immutable blob URLs, limits embeds, and omits absent evidence", () => {
