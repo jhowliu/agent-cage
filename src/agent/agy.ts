@@ -29,7 +29,15 @@ export function commandWithAgyKeyring(command: string): string {
   ].join(" && ");
 }
 
-const stdinPromptInstruction = "Follow the instructions provided on stdin.";
+/**
+ * The stdin body for one `agy --input-format stream-json` turn. agy ignores
+ * stdin when `--print` carries a prompt (agy 1.5 changelog: "no longer reading
+ * stdin when a prompt is provided via a flag"), so the prompt travels as a
+ * newline-delimited stream-json `user` message instead.
+ */
+export function agyStdinMessage(prompt: string): string {
+  return `${JSON.stringify({ event: "user", message: { content: prompt } })}\n`;
+}
 
 // Permissions allowed for the read-only reviewer inside Antigravity's unified
 // policy engine (`Deny > Ask > Allow`). File reads inside the workspace are
@@ -64,16 +72,18 @@ export type AgyCommandInput =
     };
 
 /**
- * Builds CLI arguments for `agy`. `--print=...` is attached with `=` and placed
- * last so Go's flag parser never consumes an adjacent flag as the prompt, while
- * the full prompt body arrives over stdin to stay under Linux's 128 KiB
- * single-argument limit.
+ * Builds CLI arguments for `agy`. The prompt arrives over stdin as a stream-json
+ * message (see `agyStdinMessage`) to stay under Linux's 128 KiB single-argument
+ * limit. The empty `--print=` turns on print mode, attached with `=` and placed
+ * last so Go's flag parser never consumes an adjacent flag as its value.
  */
 export function agyOptionArgs(input: AgyCommandInput): string[] {
   const args = [
     "--model",
     input.model,
     "--disable-slash-commands",
+    "--input-format",
+    "stream-json",
     "--output-format",
     "stream-json",
   ];
@@ -89,7 +99,7 @@ export function agyOptionArgs(input: AgyCommandInput): string[] {
         JSON.stringify({
           trustedWorkspaces: ["/workspace"],
         }),
-        `--print=${stdinPromptInstruction}`,
+        "--print=",
       );
       return args;
     case "read-only":
@@ -104,7 +114,7 @@ export function agyOptionArgs(input: AgyCommandInput): string[] {
             deny: [...agyReviewDeniedPermissions],
           },
         }),
-        `--print=${stdinPromptInstruction}`,
+        "--print=",
       );
       return args;
     default: {
