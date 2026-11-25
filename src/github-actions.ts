@@ -56,6 +56,11 @@ export function generateGitHubActionsWorkflow(input: GitHubActionsWorkflowInput)
   const providers = [
     ...agentProvidersInUse(input.agents ?? { implement: "codex", review: "codex" }),
   ];
+  if (providers.includes("agy")) {
+    throw new Error(
+      "Antigravity CLI (agy) uses a local Docker auth volume and is not supported in GitHub Actions workflows.",
+    );
+  }
   const agentSecrets = agentSecretNames(providers);
   const managementEnv = {
     GH_TOKEN: expression("secrets.AGENT_CAGE_GITHUB_TOKEN"),
@@ -210,7 +215,9 @@ export function requiredActionsSecretGroups(
   agents: Readonly<Record<AgentRole, AgentProvider>>,
 ): string[][] {
   return [
-    ...[...agentProvidersInUse(agents)].map((provider) => agentSecretNames([provider])),
+    ...[...agentProvidersInUse(agents)]
+      .map((provider) => agentSecretNames([provider]))
+      .filter((group) => group.length > 0),
     ["AGENT_CAGE_GITHUB_TOKEN"],
   ];
 }
@@ -223,6 +230,8 @@ export function agentSecretNames(providers: readonly AgentProvider[]): string[] 
         return ["OPENAI_API_KEY"];
       case "claude":
         return ["CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"];
+      case "agy":
+        return [];
       default: {
         const exhaustiveProvider: never = provider;
         return exhaustiveProvider;
@@ -237,6 +246,8 @@ function agentCredentialCheck(provider: AgentProvider): string {
       return 'test -n "$OPENAI_API_KEY" || { printf "Missing OPENAI_API_KEY\\n" >&2; exit 1; }';
     case "claude":
       return '{ test -n "$CLAUDE_CODE_OAUTH_TOKEN" || test -n "$ANTHROPIC_API_KEY"; } || { printf "Missing CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY\\n" >&2; exit 1; }';
+    case "agy":
+      throw new Error("Antigravity CLI (agy) is not supported in GitHub Actions.");
     default: {
       const exhaustiveProvider: never = provider;
       return exhaustiveProvider;
@@ -250,6 +261,8 @@ function agentCliPackage(provider: AgentProvider): string {
       return `@openai/codex@${codexCliVersion}`;
     case "claude":
       return `@anthropic-ai/claude-code@${claudeCodeVersion}`;
+    case "agy":
+      throw new Error("Antigravity CLI (agy) is not supported in GitHub Actions.");
     default: {
       const exhaustiveProvider: never = provider;
       return exhaustiveProvider;

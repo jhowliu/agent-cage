@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { checkAgyAuthStatus, loginAgyAuth, logoutAgyAuth } from "./agy-auth.js";
 import { cleanupEvidenceBranches } from "./cleanup-evidence.js";
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -31,6 +32,9 @@ export type CliDependencies = {
   doctorProject?: typeof doctorProject;
   cleanupManagedDockerResources?: typeof cleanupManagedDockerResources;
   cleanupEvidenceBranches?: typeof cleanupEvidenceBranches;
+  checkAgyAuthStatus?: typeof checkAgyAuthStatus;
+  loginAgyAuth?: typeof loginAgyAuth;
+  logoutAgyAuth?: typeof logoutAgyAuth;
 };
 
 export function createCli(dependencies: CliDependencies = {}): Command {
@@ -39,6 +43,9 @@ export function createCli(dependencies: CliDependencies = {}): Command {
   const revise = dependencies.reviseAgentCagePullRequest ?? reviseAgentCagePullRequest;
   const setup = dependencies.setupProject ?? setupProject;
   const doctor = dependencies.doctorProject ?? doctorProject;
+  const agyStatus = dependencies.checkAgyAuthStatus ?? checkAgyAuthStatus;
+  const agyLogin = dependencies.loginAgyAuth ?? loginAgyAuth;
+  const agyLogout = dependencies.logoutAgyAuth ?? logoutAgyAuth;
 
   program
     .name("agent-cage")
@@ -80,6 +87,75 @@ export function createCli(dependencies: CliDependencies = {}): Command {
           });
           printDoctorResult(diagnostics, color);
           if (!diagnostics.healthy) process.exitCode = 1;
+        }
+      },
+    );
+
+  const auth = program
+    .command("auth")
+    .description("Manage local agent authentication volumes.");
+
+  auth
+    .command("agy")
+    .description("Sign in to Antigravity CLI inside the persistent Docker auth volume.")
+    .option("--status", "check whether the Docker auth volume holds a valid login")
+    .option("--logout", "remove the persistent Docker auth volume")
+    .option("--image <image>", "override the runtime Docker image")
+    .action(
+      async (
+        options: { status?: boolean; logout?: boolean; image?: string },
+        command: Command,
+      ) => {
+        if (options.status === true && options.logout === true) {
+          command.error("error: --status and --logout cannot be used together");
+        }
+        const color = createColorizer(process.stdout);
+        if (options.logout === true) {
+          const result = await agyLogout();
+          console.log(
+            result.removed
+              ? `${color.success("removed")} Docker auth volume ${result.volumeName}`
+              : color.muted(`Docker auth volume ${result.volumeName} was not present.`),
+          );
+          return;
+        }
+        if (options.status === true) {
+          const status = await agyStatus({
+            cwd: process.cwd(),
+            ...(options.image === undefined ? {} : { image: options.image }),
+          });
+          if (status.authenticated) {
+            console.log(
+              `${color.success("authenticated")}: ${status.volumeName} (${status.image})`,
+            );
+          } else {
+            console.log(
+              `${color.warning("not authenticated")}: run \`agent-cage auth agy\` to sign in (${status.volumeName})`,
+            );
+            process.exitCode = 1;
+          }
+          return;
+        }
+        console.log(
+          color.info(
+            "Starting Antigravity CLI in the Docker auth volume. Complete sign-in, then run /exit to save credentials.",
+          ),
+        );
+        const result = await agyLogin({
+          cwd: process.cwd(),
+          ...(options.image === undefined ? {} : { image: options.image }),
+        });
+        if (result.authenticated) {
+          console.log(
+            `${color.success("saved")} Antigravity credentials in ${result.volumeName}`,
+          );
+        } else {
+          console.error(
+            color.failure(
+              `No Antigravity credentials were saved in ${result.volumeName}.`,
+            ),
+          );
+          process.exitCode = 1;
         }
       },
     );

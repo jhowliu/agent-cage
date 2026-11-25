@@ -4,6 +4,7 @@ import { createInterface } from "node:readline/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { stdin as input, stdout as output } from "node:process";
 import { Writable } from "node:stream";
+import { defaultAgyAuthVolumeName } from "./agent/agy.js";
 import { codexConfigModel, codexHomePath } from "./agent/codex.js";
 import {
   agentProviders,
@@ -11,6 +12,7 @@ import {
   defaultAgentModels,
   type AgentProvider,
 } from "./agent/providers.js";
+import { isAgyAuthVolumePresent } from "./agy-auth.js";
 import type { AgentCageConfig, RedGreenConfig, ReportsConfig } from "./config.js";
 import {
   loadAgentCageConfigFile,
@@ -41,7 +43,7 @@ import {
   requiredActionsSecretGroups,
   type GitHubActionsRuntime,
 } from "./github-actions.js";
-import { defaultSandboxImage } from "./docker.js";
+import { defaultSandboxImage, type DockerCommandRunner } from "./docker.js";
 import {
   detectProject,
   generateRuntimeDockerfile,
@@ -68,6 +70,7 @@ export type SetupPrompts = {
 
 export type SetupDependencies = {
   gh?: GhRunner;
+  docker?: DockerCommandRunner;
 };
 
 export type SetupResult = {
@@ -180,7 +183,7 @@ export async function setupProject(
       runtimeNotices,
     );
 
-    const actionsEnabled =
+    const requestedActions =
       options.actions ??
       (prompt === null
         ? (existing?.actions.enabled ?? false)
@@ -188,7 +191,6 @@ export async function setupProject(
             "Enable GitHub Actions issue automation?",
             existing?.actions.enabled ?? false,
           ));
-    const actions = buildActionsConfig(existing, actionsEnabled);
     // Existing configs keep their agents (including the Codex-only default);
     // only a new config picks Claude for implementation.
     const agentNotices: string[] = [];
@@ -198,6 +200,19 @@ export async function setupProject(
       implement: agent.implement.provider,
       review: agent.review.provider,
     };
+    const usesAgy = agentProvidersInUse(agents).has("agy");
+    if (usesAgy && options.actions === true) {
+      throw new Error(
+        "GitHub Actions automation cannot be enabled when agy is configured, because agy uses a local Docker auth volume.",
+      );
+    }
+    const actionsEnabled = usesAgy ? false : requestedActions;
+    if (usesAgy && requestedActions) {
+      agentNotices.push(
+        "Disabled GitHub Actions automation because agy uses a local Docker auth volume.",
+      );
+    }
+    const actions = buildActionsConfig(existing, actionsEnabled);
     const updates = {
       setup,
       verify,
@@ -250,7 +265,14 @@ export async function setupProject(
     setupResult.notices.push(...runtimeNotices, ...agentNotices);
     let githubLogin: GithubLogin | null = null;
     if (!setupResult.dryRun) {
-      const local = await configureLocalCredentials(cwd, prompt, setupResult, agents, gh);
+      const local = await configureLocalCredentials(
+        cwd,
+        prompt,
+        setupResult,
+        agents,
+        gh,
+        dependencies.docker,
+      );
       setupResult.notices.push(...local.notices);
       githubLogin = local.githubLogin;
     }
@@ -336,7 +358,7 @@ async function chooseImplementationAgent(
 ): Promise<AgentProvider> {
   if (prompts !== null) {
     const answer = (
-      await prompts.input("Implementation agent (claude or codex)", "claude")
+      await prompts.input("Implementation agent (claude, codex, or agy)", "claude")
     )
       .trim()
       .toLowerCase();
@@ -394,15 +416,34 @@ function isAgentProvider(value: string): value is AgentProvider {
   return agentProviders.some((provider) => provider === value);
 }
 
-function agentCredentialPrompt(provider: AgentProvider): { name: string; hint: string } {
+type EnvCredentialPrompt = {
+  kind: "env";
+  name: string;
+  hint: string;
+};
+
+type AgyCredentialPrompt = {
+  kind: "agy";
+};
+
+function agentCredentialPrompt(
+  provider: AgentProvider,
+): EnvCredentialPrompt | AgyCredentialPrompt {
   switch (provider) {
     case "codex":
-      return { name: "OPENAI_API_KEY", hint: "or sign in with the Codex CLI" };
+      return {
+        kind: "env",
+        name: "OPENAI_API_KEY",
+        hint: "or sign in with the Codex CLI",
+      };
     case "claude":
       return {
+        kind: "env",
         name: "CLAUDE_CODE_OAUTH_TOKEN",
         hint: "create one with `claude setup-token`",
       };
+    case "agy":
+      return { kind: "agy" };
     default: {
       const exhaustiveProvider: never = provider;
       return exhaustiveProvider;
@@ -420,6 +461,7 @@ async function configureLocalCredentials(
   setupResult: SetupResult,
   agents: AgentProviderByRole,
   gh: GhRunner,
+  docker?: DockerCommandRunner,
 ): Promise<{ notices: string[]; githubLogin: GithubLogin | null }> {
   const notices: string[] = [];
   let changed = false;
@@ -427,12 +469,30 @@ async function configureLocalCredentials(
   const envExists = await fileExists(envPath);
   const globalPath = globalCredentialsPath();
   const { env } = await readCredentialEnv(cwd, globalPath);
+  const providers = agentProvidersInUse(agents);
   const codexAuthFileAvailable = await fileExists(join(codexHomePath(), "auth.json"));
-  const missingAgentCredentials = [...agentProvidersInUse(agents)]
-    .filter((provider) => !hasAgentCredentials(provider, { env, codexAuthFileAvailable }))
+  const agyAuthAvailable = providers.has("agy")
+    ? await isAgyAuthVolumePresent(defaultAgyAuthVolumeName, docker)
+    : false;
+  const missingAgentCredentials = [...providers]
+    .filter(
+      (provider) =>
+        !hasAgentCredentials(provider, {
+          env,
+          codexAuthFileAvailable,
+          agyAuthAvailable,
+        }),
+    )
     .map((provider) => agentCredentialPrompt(provider));
 
-  for (const { name, hint } of missingAgentCredentials) {
+  for (const credential of missingAgentCredentials) {
+    if (credential.kind === "agy") {
+      notices.push(
+        "Local agy authentication is not configured; run `agent-cage auth agy` to sign in.",
+      );
+      continue;
+    }
+    const { name, hint } = credential;
     if (
       prompts === null ||
       !(await prompts.confirm(`Configure local ${name} now? (${hint})`, false))

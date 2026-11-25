@@ -2,8 +2,10 @@ import { constants } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import YAML from "yaml";
+import { defaultAgyAuthVolumeName } from "./agent/agy.js";
 import { codexHomePath } from "./agent/codex.js";
 import type { AgentAssignments } from "./agent/providers.js";
+import { isAgyAuthVolumePresent } from "./agy-auth.js";
 import type { createComposeProject } from "./compose.js";
 import {
   parseAgentCageConfig,
@@ -85,6 +87,7 @@ export type RunAgentCageDependencies = {
   publishRevision?: typeof publishRevision;
   generateRunId?: () => string;
   findCodexAuthFile?: typeof findCodexAuthFile;
+  findAgyAuthVolume?: typeof findAgyAuthVolume;
   findGithubToken?: GithubTokenLookup;
   onProgress?: (event: RunProgressEvent) => void;
   onEvent?: RunEventSink;
@@ -265,8 +268,15 @@ async function prepareRunFoundation(
   dependencies: RunAgentCageDependencies,
 ): Promise<RunFoundation> {
   const configResult = await readConfig(cwd);
+  const executionMode =
+    dependencies.executionMode ??
+    resolveExecutionMode({
+      env: process.env,
+      config: configResult.config,
+    });
   const readEnv = dependencies.readEnv ?? readRunEnv;
   const locateCodexAuthFile = dependencies.findCodexAuthFile ?? findCodexAuthFile;
+  const locateAgyAuthVolume = dependencies.findAgyAuthVolume ?? findAgyAuthVolume;
   const agentConfig = configResult.config.agent;
   const agents: AgentAssignments = {
     implement: {
@@ -280,6 +290,8 @@ async function prepareRunFoundation(
     agents: { implement: agents.implement.provider, review: agents.review.provider },
     readEnv,
     findCodexAuthFile: locateCodexAuthFile,
+    findAgyAuthVolume:
+      executionMode === "direct" ? async () => null : locateAgyAuthVolume,
     findGithubToken: dependencies.findGithubToken ?? ghTokenLookup,
   });
   const runId = options.runId ?? dependencies.generateRunId?.() ?? generateRunId();
@@ -290,12 +302,6 @@ async function prepareRunFoundation(
     source: "configured" as const,
   };
   const promptContext = await buildPromptContext(cwd);
-  const executionMode =
-    dependencies.executionMode ??
-    resolveExecutionMode({
-      env: process.env,
-      config: configResult.config,
-    });
 
   return {
     cwd,
@@ -350,6 +356,12 @@ async function findCodexAuthFile(): Promise<string | null> {
 
     throw error;
   }
+}
+
+async function findAgyAuthVolume(): Promise<string | null> {
+  return (await isAgyAuthVolumePresent(defaultAgyAuthVolumeName))
+    ? defaultAgyAuthVolumeName
+    : null;
 }
 
 function generateRunId(): string {

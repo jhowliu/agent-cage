@@ -8,7 +8,6 @@ Full setup, token, configuration, security, and QA details live in [docs/workflo
 
 ![A GitHub issue becomes a tested PR: herdr-issues hands it to Agent Cage, which writes tests first, then the code, then opens the PR](docs/live-demo.gif)
 
-
 ## Install
 
 Requirements:
@@ -63,12 +62,12 @@ verify:
 
 agent:
   implement:
-    provider: claude # or codex
+    provider: claude # claude, codex, or agy
   review:
-    provider: codex # or claude
+    provider: codex # codex, claude, or agy
 ```
 
-New configs implement with Claude Code and review with Codex. Configs without `agent.implement`/`agent.review` keep using Codex for both.
+New configs implement with Claude Code and review with Codex. Configs without `agent.implement`/`agent.review` keep using Codex for both. When `agy` (Antigravity CLI) is configured for local Docker runs, run `agent-cage auth agy` once to sign in inside the persistent `agent-cage-agy-auth` Docker volume without an API key.
 
 The wizard writes credentials with restricted permissions: agent credentials go to `~/.config/agent-cage/env` once per machine, and GitHub credentials go to the repo's `.agent-cage.env`. You can also create them manually:
 

@@ -1,4 +1,3 @@
-import { claudeRateLimitMessage } from "./agent/claude.js";
 import { execa } from "execa";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,6 +13,7 @@ import type { CommandResult, CommandRunOptions, CommandRunner } from "./publish.
 import type { ReviewAgentRunner } from "./review.js";
 import {
   agentFailureCode,
+  agentRateLimitMessage,
   agentShellCommand,
   extractAgentResult,
   type AgentAssignment,
@@ -134,6 +134,7 @@ export function createDockerShellRunner(
           labels: { "agent-cage.run_id": sandbox.runId },
           env: commandEnv,
           codexAuthFilePath: options.codexAuthFilePath,
+          agyAuthVolumeName: options.agyAuthVolumeName,
           command,
           interactive: options.input !== undefined,
         }),
@@ -453,7 +454,7 @@ export function agentCommandFailure(
   return new RunFailureError(
     code,
     code === "agent_rate_limited"
-      ? `${claudeRateLimitMessage(result.stdout)}\n\n${log}`
+      ? `${agentRateLimitMessage(provider, result)}\n\n${log}`
       : log,
   );
 }

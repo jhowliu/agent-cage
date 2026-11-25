@@ -172,6 +172,8 @@ function agentInstructionFilesRule(provider: AgentProvider): string {
       // Claude Code's native memory is CLAUDE.md; name AGENTS.md explicitly so
       // repos that only document conventions there are still followed.
       return "Before editing, read and follow the AGENTS.md and CLAUDE.md files that apply to the paths you change.";
+    case "agy":
+      return "Before editing, read and follow the AGENTS.md and GEMINI.md files that apply to the paths you change.";
     default: {
       const exhaustiveProvider: never = provider;
       return exhaustiveProvider;
