@@ -5,7 +5,7 @@ The base image is the minimal runtime for Agent Cage agent containers.
 Published image:
 
 ```text
-ghcr.io/jhowliu/agent-cage/base:0.1.2
+ghcr.io/jhowliu/agent-cage/base:0.1.3
 ```
 
 The CLI should use immutable version tags for reproducible runs. The `latest` tag is published only as a manual testing convenience.
@@ -17,6 +17,7 @@ The image is based on `node:22-bookworm` and includes:
 - Node.js and npm
 - pinned `@openai/codex`
 - pinned `@anthropic-ai/claude-code`
+- Antigravity CLI `agy`, with `dbus-x11`, `gnome-keyring` and `libsecret-tools` so `agy` can keep its login in a keyring
 - `git`
 - GitHub CLI `gh`
 - `curl`
@@ -45,4 +46,4 @@ ghcr.io/jhowliu/agent-cage/base:<version>
 ghcr.io/jhowliu/agent-cage/base:latest
 ```
 
-Publishing is available through manual workflow dispatch and tags shaped like `base-v0.1.2`. Published images include `linux/amd64` and `linux/arm64` manifests.
+Publishing is available through manual workflow dispatch and tags shaped like `base-v0.1.3`. Published images include `linux/amd64` and `linux/arm64` manifests.

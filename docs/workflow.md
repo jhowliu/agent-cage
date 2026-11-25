@@ -117,7 +117,7 @@ services:
     - pg_isready -h postgres -U postgres
 
 runtime:
-  image: ghcr.io/jhowliu/agent-cage/base:0.1.2
+  image: ghcr.io/jhowliu/agent-cage/base:0.1.3
   dockerfile: null
 
 agent:
@@ -453,7 +453,7 @@ Use `AGENT_CAGE_GITHUB_TOKEN` rather than the built-in `GITHUB_TOKEN`: events pr
 jobs:
   run:
     runs-on: ubuntu-latest
-    container: ghcr.io/jhowliu/agent-cage/base:0.1.2
+    container: ghcr.io/jhowliu/agent-cage/base:0.1.3
     services:
       postgres:
         image: postgres:16
@@ -531,7 +531,7 @@ Non-goals:
 The base agent image is defined in `docker/base/Dockerfile` and published to GHCR:
 
 ```text
-ghcr.io/jhowliu/agent-cage/base:0.1.2
+ghcr.io/jhowliu/agent-cage/base:0.1.3
 ```
 
 The image is intentionally orchestration-only. It includes Node.js/npm, a pinned `@openai/codex` CLI, `git`, GitHub CLI `gh`, `curl`, `jq`, certificates, OpenSSH client, the non-root `agent` user, and `/workspace`. It does not include Docker CLI, Python, Go, Rust, Java, native build toolchains, database clients, browser tooling, `tini`, or a custom entrypoint.

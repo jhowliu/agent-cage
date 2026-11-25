@@ -92,7 +92,7 @@ export type CleanupDockerReport = {
   skippedActiveRunIds: string[];
 };
 
-export const defaultSandboxImage = "ghcr.io/jhowliu/agent-cage/base:0.1.2";
+export const defaultSandboxImage = "ghcr.io/jhowliu/agent-cage/base:0.1.3";
 export const defaultWorkspacePath = "/workspace";
 
 const runIdLabelName = "agent-cage.run_id";

@@ -336,7 +336,7 @@ Agent Cage prepares disposable Docker resources per run:
 
 - A labeled Docker volume for `/workspace`
 - A labeled Docker network for run-local connectivity
-- An agent container using the pinned default image `ghcr.io/jhowliu/agent-cage/base:0.1.2`
+- An agent container using the pinned default image `ghcr.io/jhowliu/agent-cage/base:0.1.3`
 
 The sandbox runs as the non-root `agent` user, clones the target repo into the volume, and does not bind mount the host working tree, Docker socket, SSH config, GitHub CLI config, or host ports.
 
