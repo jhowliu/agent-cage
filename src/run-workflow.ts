@@ -665,6 +665,7 @@ async function runImplementationLoop(input: {
         {
           role: "implement",
           agent: input.context.agents.implement,
+          onUsage: (usage) => input.journal.recordAgentUsage(usage),
           agentCommand: agentShellCommand(input.context.agents.implement, {
             access: "workspace-write",
             prompt,
@@ -888,6 +889,7 @@ async function runRedStep(
         {
           role: "implement",
           agent: input.context.agents.implement,
+          onUsage: (usage) => input.journal.recordAgentUsage(usage),
           agentCommand: agentShellCommand(input.context.agents.implement, {
             access: "workspace-write",
             prompt,

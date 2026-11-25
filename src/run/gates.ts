@@ -31,6 +31,7 @@ import { RunFailureError } from "./errors.js";
 import { formatReviewIssueContext } from "./prompts.js";
 import { formatRedGreenSummary, type RedGreenReport } from "./red-green.js";
 import type { ReportCollection } from "./reports.js";
+import type { AgentUsage } from "./usage.js";
 
 /**
  * `reviewSummary` is what the review agent sees of a passed verify: each
@@ -60,6 +61,8 @@ export type RunGateJournal = {
     decision: ReviewDecision;
     report: ReviewReport;
   }) => Promise<void>;
+  recordAgentUsage?: (usage: AgentUsage | null) => void;
+  prUsage?: () => Promise<string | null>;
   writeArtifact: (name: string, content: string) => Promise<string>;
   writeJsonArtifact: (name: string, value: unknown) => Promise<void>;
 };
@@ -160,6 +163,7 @@ export async function runReviewGate(input: {
         input.shell,
         reviewCredentials,
         input.context.executionMode,
+        (usage) => input.journal.recordAgentUsage?.(usage),
       ),
       ...(reviewCredentials.env === undefined ? {} : { env: reviewCredentials.env }),
     });
@@ -215,6 +219,7 @@ export async function runPublishGate(input: {
             authorName: input.context.config.git.author_name,
             authorEmail: input.context.config.git.author_email,
           });
+    const usage = (await input.journal.prUsage?.()) ?? null;
     const shared = {
       cwd: input.context.cwd,
       issue: input.context.issue,
@@ -227,6 +232,7 @@ export async function runPublishGate(input: {
         verification: input.verification.items,
         reviewStatus: "Independent review passed.",
         risks: [],
+        ...(usage === null ? {} : { usage }),
         ...(evidence === undefined ? {} : { evidence }),
       },
       git: createGitCommandRunner(input.shell, publishCredentials),

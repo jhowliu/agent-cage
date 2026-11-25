@@ -34,6 +34,8 @@ export type PublishMetadata = {
   evidence?: EvidenceResult;
   reviewStatus: string;
   risks: string[];
+  // Stage times and agent token usage, as the `- Usage:` bullet's value.
+  usage?: string;
 };
 
 export type PublishSuccessfulRunInput = {
@@ -363,7 +365,9 @@ ${input.metadata.reviewStatus}
 ${risks}
 
 ## Run
-- Run ID: ${input.metadata.runId}
+- Run ID: ${input.metadata.runId}${
+    input.metadata.usage === undefined ? "" : `\n- Usage: ${input.metadata.usage}`
+  }
 
 ## Issue
 ${formatIssueLinkage(input.issue)}

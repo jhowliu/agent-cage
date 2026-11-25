@@ -21,6 +21,7 @@ import {
   type AgentProvider,
   type AgentRole,
 } from "./agent/providers.js";
+import { parseAgentUsage, type AgentUsage } from "./run/usage.js";
 import type { ExecutionMode } from "./config.js";
 import type { FailureCode } from "./state.js";
 import { shellQuote } from "./shell.js";
@@ -396,6 +397,7 @@ export function createReviewAgentRunner(
   shell: ShellRunner,
   options: DockerCommandOptions | undefined,
   executionMode: ExecutionMode,
+  onUsage?: (usage: AgentUsage | null) => void,
 ): ReviewAgentRunner {
   return {
     async run(input): Promise<string> {
@@ -406,6 +408,9 @@ export function createReviewAgentRunner(
         outputSchema: input.outputSchema,
       });
       const result = await shell.run(command, { ...options, input: stdin });
+      onUsage?.(
+        parseAgentUsage(input.agent.provider, `${result.stdout}\n${result.stderr}`),
+      );
 
       if (result.exitCode !== 0) {
         throw agentCommandFailure(
@@ -456,12 +461,21 @@ export function agentCommandFailure(
 /** Like requiredShell, for agent commands: failures carry an agent failure code. */
 export async function requiredAgentShell(
   shell: ShellRunner,
-  input: { role: AgentRole; agent: AgentAssignment; agentCommand: AgentCommand },
+  input: {
+    role: AgentRole;
+    agent: AgentAssignment;
+    agentCommand: AgentCommand;
+    // Called with the command's usage, failed commands included.
+    onUsage?: ((usage: AgentUsage | null) => void) | undefined;
+  },
   redactor: (input: string) => string,
   options?: DockerCommandOptions,
 ): Promise<string> {
   const { command, stdin } = input.agentCommand;
   const result = await shell.run(command, { ...options, input: stdin });
+  input.onUsage?.(
+    parseAgentUsage(input.agent.provider, `${result.stdout}\n${result.stderr}`),
+  );
   // The prompt is in its own artifact, so the log keeps only the command.
   const log = redactor(formatCommandLog(command, result));
 

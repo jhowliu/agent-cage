@@ -2615,3 +2615,113 @@ reports:
     await rm(repoDir, { recursive: true, force: true });
   }
 });
+
+async function runWithUsage(input: {
+  runId: string;
+  maxIterations: number;
+  verifyPasses: (call: number) => boolean;
+}): Promise<{ cwd: string; summary: string; prBodyUsage: string | null }> {
+  const cwd = await createProject(`
+verify:
+  - npm test
+agent:
+  max_iterations: ${input.maxIterations}
+`);
+  const diff = `diff --git a/src/app.ts b/src/app.ts
+@@ -1 +1,2 @@
+ export const ok = true;
++export const changed = true;
+`;
+  let verifyCalls = 0;
+  let implementCalls = 0;
+  let prBodyUsage: string | null = null;
+  const shell: ShellRunner = {
+    async run(command): Promise<CommandResult> {
+      if (command.includes("git fetch origin")) return commandResult();
+      if (command.includes("codex exec")) {
+        implementCalls += 1;
+        return commandResult(`done\ntokens used\n${implementCalls},000`);
+      }
+      if (command === "npm test") {
+        verifyCalls += 1;
+        return input.verifyPasses(verifyCalls)
+          ? commandResult("ok")
+          : commandResult("", 1, "tests failed");
+      }
+      if (command.includes("git add --intent-to-add")) return commandResult(diff);
+      throw new Error(`Unexpected shell command: ${command}`);
+    },
+  };
+
+  await runAgentCage(
+    { cwd, issueUrl: issue.url },
+    {
+      executionMode: "docker",
+      generateRunId: () => input.runId,
+      readEnv: async () => ({ GITHUB_TOKEN: "token-value" }),
+      findCodexAuthFile: async () => null,
+      fetchIssueContext: async () => issue,
+      resolveTargetRepo: async () => repoResolution,
+      createAuthenticatedRepo: () => ({
+        repo,
+        cloneUrl: "https://github.com/jhowliu/agent-cage.git",
+        redactedCloneUrl: "https://github.com/jhowliu/agent-cage.git",
+      }),
+      createDockerSandbox: () => fakeSandbox([]),
+      createShellRunner: () => shell,
+      runIndependentReview: async () => passingReview(),
+      publishSuccessfulRun: async (publishInput) => {
+        prBodyUsage = publishInput.metadata.usage ?? null;
+        return {
+          branchName: "agent-cage/usage",
+          commitMessage: "usage",
+          prTitle: "usage",
+          prBody: "body",
+          prUrl: "https://github.com/jhowliu/agent-cage/pull/106",
+        };
+      },
+    },
+  );
+  const summary = await readFile(
+    join(cwd, ".agent-cage", "runs", input.runId, "summary.md"),
+    "utf8",
+  );
+  return { cwd, summary, prBodyUsage };
+}
+
+test("runAgentCage records every implement call in the summary's Usage table", async () => {
+  const { cwd, summary, prBodyUsage } = await runWithUsage({
+    runId: "run-usage-ok",
+    maxIterations: 2,
+    verifyPasses: (call) => call > 1,
+  });
+
+  try {
+    assert.match(summary, /## Usage/);
+    assert.match(summary, /\| Stage \| Attempts \| Time \| Tokens \| Cost \|/);
+    // Two implement calls of 1,000 and 2,000 tokens are summed.
+    assert.match(summary, /\| implement \| 2 \| .* \| 3000 total \| — \|/);
+    assert.match(summary, /\| verify \| 2 \|/);
+    assert.match(summary, /\| publish \| 1 \|/);
+    assert.match(prBodyUsage ?? "", /^implement 2× .* 3k tokens · verify 2× /);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("runAgentCage's failed run summary also has the Usage table", async () => {
+  const { cwd, summary } = await runWithUsage({
+    runId: "run-usage-failed",
+    maxIterations: 1,
+    verifyPasses: () => false,
+  });
+
+  try {
+    assert.match(summary, /Failure:/);
+    assert.match(summary, /## Usage/);
+    assert.match(summary, /\| implement \| 1 \| .* \| 1000 total \| — \|/);
+    assert.match(summary, /\| verify \| 1 \|/);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
