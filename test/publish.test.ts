@@ -109,6 +109,18 @@ test("formatPrBody opens with the review's description, then verification, revie
   assert.match(body, /Closes #11/);
 });
 
+test("formatPrBody puts the Usage bullet in Run", () => {
+  const body = formatPrBody({
+    issue: githubIssue,
+    metadata: { ...metadata, usage: "implement 2× 5m12s 2.1M tokens $0.94" },
+  });
+
+  assert.match(
+    body,
+    /## Run\n- Run ID: run-1234567890abcdef\n- Usage: implement 2× 5m12s 2.1M tokens \$0.94\n/,
+  );
+});
+
 test("formatPrBody falls back to a one-line summary without a review description", () => {
   const body = formatPrBody({
     issue: githubIssue,

@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import type { PublishSuccessfulRunResult } from "../publish.js";
 import type { ReviewReport } from "../review.js";
 import type { RunProgressEvent, RuntimeContext } from "../run-workflow.js";
@@ -10,7 +11,15 @@ import {
   type CanonicalStage,
   type RunEvent,
   type RunEventSink,
+  parseRunEventLine,
 } from "./events.js";
+import {
+  formatPrUsage,
+  formatUsageTable,
+  stageDurations,
+  type AgentUsage,
+  type StageUsageEntry,
+} from "./usage.js";
 
 type PhaseBody = () => Promise<string | undefined>;
 
@@ -36,6 +45,8 @@ export class RunJournal {
     review: 0,
     publish: 0,
   };
+
+  readonly #usage: StageUsageEntry[] = [];
 
   #activeStage: ActiveStage | null = null;
   #activeActivity: ActiveActivity | null = null;
@@ -156,15 +167,46 @@ export class RunJournal {
     });
   }
 
-  async recordFailure(failureCode: FailureCode, error: unknown): Promise<void> {
-    await this.writeArtifact(
-      "summary.md",
-      `# ${this.#context.runId}\n\nFailure:\n\n\`\`\`\n${formatError(error)}\n\`\`\`\n`,
-    );
+  /** Records what one agent command used, against the running stage. */
+  recordAgentUsage(usage: AgentUsage | null): void {
+    if (usage === null || this.#activeStage === null) {
+      return;
+    }
+    this.#usage.push({ stage: this.#activeStage.stage, usage });
+  }
 
+  async #stageTimes(): Promise<ReturnType<typeof stageDurations>> {
+    const content = await readFile(
+      this.#store.artifactPath(this.#context.runId, runEventJournalFileName),
+      "utf8",
+    );
+    return stageDurations(
+      content
+        .split(/\r?\n/)
+        .filter((line) => line.trim() !== "")
+        .map(parseRunEventLine),
+    );
+  }
+
+  /** The `- Usage:` value for the PR body, or null when nothing ran. */
+  async prUsage(): Promise<string | null> {
+    return formatPrUsage(await this.#stageTimes(), this.#usage);
+  }
+
+  async #usageTable(): Promise<string> {
+    const table = formatUsageTable(await this.#stageTimes(), this.#usage);
+    return table === "" ? "" : `\n${table}`;
+  }
+
+  async recordFailure(failureCode: FailureCode, error: unknown): Promise<void> {
     if (this.#activeStage !== null) {
       await this.failStage(failureCode);
     }
+
+    await this.writeArtifact(
+      "summary.md",
+      `# ${this.#context.runId}\n\nFailure:\n\n\`\`\`\n${formatError(error)}\n\`\`\`\n${await this.#usageTable()}`,
+    );
 
     await this.#store.updateRunStatus(this.#context.runId, {
       status: failureCode === "secret_guard_failed" ? "guard_failed" : "failed",
@@ -182,10 +224,6 @@ export class RunJournal {
   }
 
   async recordSuccess(result: PublishSuccessfulRunResult): Promise<void> {
-    await this.writeArtifact(
-      "summary.md",
-      `# ${this.#context.runId}\n\nPR: ${result.prUrl}\n`,
-    );
     await this.#store.updateRunStatus(this.#context.runId, {
       status: "succeeded",
       prUrl: result.prUrl,
@@ -205,6 +243,10 @@ export class RunJournal {
       },
     });
     await this.finishStage();
+    await this.writeArtifact(
+      "summary.md",
+      `# ${this.#context.runId}\n\nPR: ${result.prUrl}\n${await this.#usageTable()}`,
+    );
     await this.#events.append({
       type: "run.finished",
       payload: {

@@ -271,6 +271,10 @@ When `reports.junit` collected files, Agent Cage reads their redacted copies in 
 
 Point each tool's output at the paths you list, for example `vitest run --reporter=junit --outputFile=reports/junit.xml` or Playwright's default `test-results/`.
 
+## Usage
+
+`summary.md` ends with a `## Usage` table: one row per stage that ran, with its attempts, time, agent tokens and cost. Agent Cage reads the numbers from what the agents print and adds nothing to their commands. Claude's tokens are split into input, output, cache read and cache write, and several agent calls in one stage are summed. Codex prints only a total, so it has no split and no cost. Claude's cost is the API list price (`total_cost_usd`), not what a subscription login is billed. Cells with nothing to show are `—`. The PR's `## Run` section has a one-line `- Usage:` summary of the stages before publish.
+
 ## Doctor
 
 ```bash
