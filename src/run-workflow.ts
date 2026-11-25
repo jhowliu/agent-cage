@@ -1,3 +1,4 @@
+import { readCoverageItem } from "./run/coverage.js";
 import { execaGhRunner, type CommandRunner } from "./publish.js";
 import { publishEvidence } from "./run/evidence.js";
 import { resolve } from "node:path";
@@ -494,12 +495,7 @@ async function provisionDockerSandbox(input: {
   const sandbox = input.createSandbox(sandboxOptions);
   input.registerSandbox(sandbox);
   // Failure evidence is published after the journal has closed its final stage.
-  const rawShell = input.makeShellRunner(
-    sandbox,
-    {},
-    input.sink,
-    input.shellTimeouts,
-  );
+  const rawShell = input.makeShellRunner(sandbox, {}, input.sink, input.shellTimeouts);
   input.registerFailureShell(rawShell);
   const shell = journal.instrumentShell(rawShell);
 
@@ -720,6 +716,21 @@ async function runImplementationLoop(input: {
     }
 
     const diff = await readRunDiff(input.shell, input.context);
+    if (verification.reports?.files.some((file) => file.kind === "lcov")) {
+      const workspace = await input.shell.run("pwd", { onData: (): void => undefined });
+      const coverage = await readCoverageItem(
+        (name) => input.journal.artifactPath(name),
+        verification.reports,
+        diff,
+        input.context.executionMode === "docker" ? "/workspace" : workspace.stdout.trim(),
+      );
+      if (coverage !== null) {
+        const item = input.redactor(coverage);
+        verification.items.push(item);
+        verification.reviewSummary += `\n\n${item}`;
+      }
+    }
+
     let secretGuard: ReturnType<typeof runSecretGuardGate>;
     try {
       secretGuard = runSecretGuardGate({

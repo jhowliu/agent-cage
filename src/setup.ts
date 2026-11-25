@@ -904,7 +904,7 @@ async function chooseJunit(
   if (
     prompts !== null &&
     !(await prompts.confirm(
-      `Show test results in the PR (${offer.runner} JUnit report)?\n  - verify: ${offer.command} -> ${offer.replacement}\n  - reports.junit: ${offer.glob}`,
+      `Show test results in the PR (${offer.runner}${offer.glob === "" ? "" : " JUnit report"}${offer.coverageFlags === undefined ? "" : " and changed-line coverage"})?\n  - verify: ${offer.command} -> ${offer.replacement}${offer.coverageFlags === undefined ? "" : ` ${offer.coverageFlags}`}\n  - reports.junit: ${offer.glob}${offer.coverageFlags === undefined ? "" : "\n  - reports.lcov: coverage/lcov.info"}`,
       true,
     ))
   ) {
@@ -913,9 +913,18 @@ async function chooseJunit(
   const base = existing?.reports ?? { junit: [], lcov: [], evidence: [] };
   return {
     verify: verify.map((command) =>
-      command === offer.command ? offer.replacement : command,
+      command === offer.command
+        ? `${offer.replacement}${offer.coverageFlags === undefined || base.lcov.length > 0 ? "" : ` ${offer.coverageFlags}`}`
+        : command,
     ),
-    reports: { ...base, junit: [offer.glob] },
+    reports: {
+      ...base,
+      junit: offer.glob === "" ? base.junit : [offer.glob],
+      lcov:
+        offer.coverageFlags === undefined || base.lcov.length > 0
+          ? base.lcov
+          : ["coverage/lcov.info"],
+    },
   };
 }
 

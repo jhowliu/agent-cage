@@ -325,13 +325,18 @@ test("detectProject offers JUnit for runners the test script runs directly", asy
     runner: "node:test",
     command: "npm test",
     replacement: junitNodeTest,
+    coverageFlags:
+      "--experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info",
     glob: "reports/junit.xml",
   });
   assert.match(
     (await detect({ test: "vitest run" }))?.replacement ?? "",
     /npm test -- --reporter=default --reporter=junit --outputFile\.junit=reports\/junit\.xml$/,
   );
-  assert.equal((await detect({ test: "jest" }))?.runner ?? null, null);
+  assert.equal(
+    (await detect({ test: "jest" }))?.coverageFlags,
+    "--coverage --coverageReporters=lcov",
+  );
   assert.equal(
     (await detect({ test: "jest" }, { "jest-junit": "^16.0.0" }))?.runner,
     "jest",

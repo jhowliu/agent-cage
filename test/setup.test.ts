@@ -731,7 +731,7 @@ test("setup keeps the API default Codex model when OPENAI_API_KEY is set", async
 
 type JunitConfig = {
   verify?: string[];
-  reports?: { junit?: string[]; evidence?: string[] };
+  reports?: { junit?: string[]; evidence?: string[]; lcov?: string[] };
 };
 
 async function nodeRepo(
@@ -832,8 +832,10 @@ test("setup offers Jest JUnit only when jest-junit is a dependency", async () =>
     await setup(without, {}, recordingPrompts(asked));
     await setup(without, { yes: true, actions: false });
 
-    assert.deepEqual(asked, []);
-    assert.equal((await readJunitConfig(without)).reports, undefined);
+    assert.equal(asked.length, 1);
+    assert.deepEqual((await readJunitConfig(without)).reports?.lcov, [
+      "coverage/lcov.info",
+    ]);
   } finally {
     await rm(without, { recursive: true, force: true });
   }
@@ -967,3 +969,43 @@ test("evidence can be accepted without a JUnit offer in new and existing configs
     }
   }
 });
+
+for (const [script, dependencies, flags] of [
+  ["node --test", {}, "--experimental-test-coverage"],
+  ["jest", {}, "--coverageReporters=lcov"],
+  ["vitest run", {}, null],
+  ["vitest run", { "@vitest/coverage-v8": "*" }, "--coverage.reporter=lcov"],
+] satisfies [string, Record<string, string>, string | null][]) {
+  test(`setup coverage offer for ${script} with ${JSON.stringify(dependencies)}`, async () => {
+    const cwd = await nodeRepo({ test: script }, dependencies);
+    try {
+      await setup(cwd, {}, recordingPrompts([]));
+      const config = await readJunitConfig(cwd);
+      if (flags === null) assert.deepEqual(config.reports?.lcov, []);
+      else {
+        assert.ok(config.verify?.[0]?.includes(flags));
+        assert.deepEqual(config.reports?.lcov, ["coverage/lcov.info"]);
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+}
+
+for (const coverage of [false, true]) {
+  test(`pytest setup coverage requires pytest-cov (${coverage})`, async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "agent-cage-setup-"));
+    try {
+      await writeFile(
+        join(cwd, "requirements.txt"),
+        coverage ? "pytest\npytest-cov\n" : "pytest\n",
+      );
+      await setup(cwd, {}, recordingPrompts([]));
+      const config = await readJunitConfig(cwd);
+      assert.deepEqual(config.reports?.lcov, coverage ? ["coverage/lcov.info"] : []);
+      assert.equal(config.verify?.[0]?.includes("--cov-report=lcov:"), coverage);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+}

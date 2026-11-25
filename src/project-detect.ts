@@ -46,6 +46,7 @@ export type JunitOffer = {
   replacement: string;
   /** The `reports.junit` glob the runner writes to. */
   glob: string;
+  coverageFlags?: string;
 };
 
 export type EvidenceOffer = {
@@ -192,6 +193,20 @@ function nodeJunit(
     command,
     replacement,
     glob: junitFile,
+    ...(runner === "node:test"
+      ? {
+          coverageFlags:
+            "--experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info",
+        }
+      : runner === "jest"
+        ? { coverageFlags: "--coverage --coverageReporters=lcov" }
+        : runner === "vitest" &&
+            packageJson.dependencies.some(
+              (name) =>
+                name === "@vitest/coverage-v8" || name === "@vitest/coverage-istanbul",
+            )
+          ? { coverageFlags: "--coverage --coverage.reporter=lcov" }
+          : {}),
   });
 
   if (/^node\s+--test\b/.test(testScript)) {
@@ -212,6 +227,9 @@ function nodeJunit(
       "jest",
       `${mkdir} && JEST_JUNIT_OUTPUT_FILE=${junitFile} ${forward} --reporters=default --reporters=jest-junit`,
     );
+  }
+  if (/^jest\b/.test(testScript)) {
+    return { ...offer("jest", forward), glob: "" };
   }
   return null;
 }
@@ -330,11 +348,24 @@ function parsePackageJson(text: string): {
 const pythonVenv = "$HOME/.venv";
 
 async function detectPython(files: ProjectFiles): Promise<EcosystemDetection | null> {
+  const dependencies = (
+    await Promise.all(
+      ["requirements.txt", "pyproject.toml", "uv.lock", "poetry.lock"].map((name) =>
+        files.read(name),
+      ),
+    )
+  ).join("\n");
+  const coverage = /\bpytest-cov\b/i.test(dependencies);
   if (await files.exists("uv.lock")) {
-    return pythonDetection(["uv sync --frozen"], "uv run pytest", ["uv"]);
+    return pythonDetection(["uv sync --frozen"], "uv run pytest", ["uv"], coverage);
   }
   if (await files.exists("poetry.lock")) {
-    return pythonDetection(["poetry install"], "poetry run pytest", ["uv", "poetry"]);
+    return pythonDetection(
+      ["poetry install"],
+      "poetry run pytest",
+      ["uv", "poetry"],
+      coverage,
+    );
   }
   if (await files.exists("requirements.txt")) {
     return pythonDetection(
@@ -343,6 +374,7 @@ async function detectPython(files: ProjectFiles): Promise<EcosystemDetection | n
       ],
       `"${pythonVenv}/bin/python" -m pytest`,
       ["python"],
+      coverage,
     );
   }
   return null;
@@ -352,6 +384,7 @@ function pythonDetection(
   setup: string[],
   pytest: string,
   toolchains: ProjectToolchain[],
+  coverage: boolean,
 ): EcosystemDetection {
   return {
     ecosystem: "python",
@@ -368,6 +401,9 @@ function pythonDetection(
       command: pytest,
       replacement: `mkdir -p reports && ${pytest} --junitxml=${junitFile}`,
       glob: junitFile,
+      ...(coverage
+        ? { coverageFlags: "--cov=. --cov-report=lcov:coverage/lcov.info" }
+        : {}),
     },
   };
 }
