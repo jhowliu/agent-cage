@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execa } from "execa";
 import { z } from "zod";
+import { agyOptionArgs, extractAgyResult } from "./agent/agy.js";
 import { claudeOptionArgs, extractClaudeResult } from "./agent/claude.js";
 import type { AgentAssignment } from "./agent/providers.js";
 import { RunFailureError } from "./run/errors.js";
@@ -187,6 +188,8 @@ export const execaReviewAgentRunner: ReviewAgentRunner = {
         return await runCodexReviewOnHost(input);
       case "claude":
         return await runClaudeReviewOnHost(input);
+      case "agy":
+        return await runAgyReviewOnHost(input);
       default: {
         const exhaustiveProvider: never = input.agent.provider;
         return exhaustiveProvider;
@@ -194,6 +197,33 @@ export const execaReviewAgentRunner: ReviewAgentRunner = {
     }
   },
 };
+
+async function runAgyReviewOnHost(input: ReviewAgentRunInput): Promise<string> {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "agent-cage-agy-review-"));
+  const outputSchemaPath = join(tempDirectory, "review-output-schema.json");
+
+  try {
+    await writeFile(
+      outputSchemaPath,
+      `${JSON.stringify(input.outputSchema, null, 2)}\n`,
+      "utf8",
+    );
+    const args = agyOptionArgs({
+      access: "read-only",
+      model: input.agent.model,
+      outputSchema: outputSchemaPath,
+    });
+    const result = await execa("agy", args, {
+      input: input.prompt,
+      cwd: input.cwd,
+      ...(input.env === undefined ? {} : { env: input.env }),
+    });
+
+    return extractAgyResult(result.stdout);
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
+}
 
 async function runCodexReviewOnHost(input: ReviewAgentRunInput): Promise<string> {
   const tempDirectory = await mkdtemp(join(tmpdir(), "agent-cage-review-"));

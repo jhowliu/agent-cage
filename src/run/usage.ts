@@ -15,6 +15,14 @@ export type AgentUsage =
       // Codex prints only a total: no split and no cost.
       provider: "codex";
       totalTokens: number;
+    }
+  | {
+      provider: "agy";
+      inputTokens: number;
+      outputTokens: number;
+      thinkingTokens: number;
+      cacheReadTokens: number;
+      totalTokens: number;
     };
 
 export type StageUsageEntry = {
@@ -69,6 +77,43 @@ function parseCodexUsage(output: string): AgentUsage | null {
   return Number.isFinite(total) ? { provider: "codex", totalTokens: total } : null;
 }
 
+function parseAgyUsage(output: string): AgentUsage | null {
+  const lines = output.split(/\r?\n/);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index]?.trim() ?? "";
+    if (!line.startsWith("{") || !line.includes('"result"')) continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!isRecord(parsed) || parsed.event !== "result" || !isRecord(parsed.result)) {
+      continue;
+    }
+    const usage = isRecord(parsed.result.usage) ? parsed.result.usage : null;
+    if (usage === null) continue;
+    const inputTokens = count(usage.input_tokens);
+    const outputTokens = count(usage.output_tokens);
+    const thinkingTokens = count(usage.thinking_tokens);
+    const cacheReadTokens = count(usage.cache_read_tokens);
+    const reportedTotal = count(usage.total_tokens);
+    const totalTokens =
+      reportedTotal > 0
+        ? reportedTotal
+        : inputTokens + outputTokens + thinkingTokens + cacheReadTokens;
+    return {
+      provider: "agy",
+      inputTokens,
+      outputTokens,
+      thinkingTokens,
+      cacheReadTokens,
+      totalTokens,
+    };
+  }
+  return null;
+}
+
 /** The usage of one agent command, or null when its output has none. */
 export function parseAgentUsage(
   provider: AgentProvider,
@@ -79,6 +124,8 @@ export function parseAgentUsage(
       return parseClaudeUsage(output);
     case "codex":
       return parseCodexUsage(output);
+    case "agy":
+      return parseAgyUsage(output);
     default: {
       const exhaustiveProvider: never = provider;
       return exhaustiveProvider;
@@ -145,12 +192,23 @@ export function formatTokenCount(tokens: number): string {
 }
 
 export function totalTokens(usage: AgentUsage): number {
-  return usage.provider === "codex"
-    ? usage.totalTokens
-    : usage.inputTokens +
+  switch (usage.provider) {
+    case "codex":
+      return usage.totalTokens;
+    case "claude":
+      return (
+        usage.inputTokens +
         usage.outputTokens +
         usage.cacheReadTokens +
-        usage.cacheWriteTokens;
+        usage.cacheWriteTokens
+      );
+    case "agy":
+      return usage.totalTokens;
+    default: {
+      const exhaustiveUsage: never = usage;
+      return exhaustiveUsage;
+    }
+  }
 }
 
 function formatInt(value: number): string {
@@ -159,22 +217,42 @@ function formatInt(value: number): string {
 
 function stageTokens(usages: readonly AgentUsage[]): string {
   const claude = { input: 0, output: 0, read: 0, write: 0, count: 0 };
+  const agy = { input: 0, output: 0, thinking: 0, read: 0, count: 0 };
   let codex: number | null = null;
   for (const usage of usages) {
-    if (usage.provider === "claude") {
-      claude.input += usage.inputTokens;
-      claude.output += usage.outputTokens;
-      claude.read += usage.cacheReadTokens;
-      claude.write += usage.cacheWriteTokens;
-      claude.count += 1;
-    } else {
-      codex = (codex ?? 0) + usage.totalTokens;
+    switch (usage.provider) {
+      case "claude":
+        claude.input += usage.inputTokens;
+        claude.output += usage.outputTokens;
+        claude.read += usage.cacheReadTokens;
+        claude.write += usage.cacheWriteTokens;
+        claude.count += 1;
+        break;
+      case "codex":
+        codex = (codex ?? 0) + usage.totalTokens;
+        break;
+      case "agy":
+        agy.input += usage.inputTokens;
+        agy.output += usage.outputTokens;
+        agy.thinking += usage.thinkingTokens;
+        agy.read += usage.cacheReadTokens;
+        agy.count += 1;
+        break;
+      default: {
+        const exhaustiveUsage: never = usage;
+        return exhaustiveUsage;
+      }
     }
   }
   const cells: string[] = [];
   if (claude.count > 0) {
     cells.push(
       `${formatInt(claude.input)} in / ${formatInt(claude.output)} out / ${formatInt(claude.read)} cache read / ${formatInt(claude.write)} cache write`,
+    );
+  }
+  if (agy.count > 0) {
+    cells.push(
+      `${formatInt(agy.input)} in / ${formatInt(agy.output)} out / ${formatInt(agy.thinking)} thinking / ${formatInt(agy.read)} cache read`,
     );
   }
   if (codex !== null) cells.push(`${formatInt(codex)} total`);

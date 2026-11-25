@@ -1,12 +1,13 @@
-import { claudeRateLimitMessage } from "./agent/claude.js";
 import { execa } from "execa";
 import { access, readFile, stat } from "node:fs/promises";
 import { constants } from "node:fs";
 import { join, resolve } from "node:path";
+import { defaultAgyAuthVolumeName } from "./agent/agy.js";
 import { codexHomePath } from "./agent/codex.js";
 import {
   agentFailureCode,
   agentProvidersInUse,
+  agentRateLimitMessage,
   agentRoles,
   agentShellCommand,
   defaultAgentModels,
@@ -119,15 +120,31 @@ export async function doctorProject(
     implement: configState.config.agent.implement.provider,
     review: configState.config.agent.review.provider,
   };
+  const providers = agentProvidersInUse(agents);
+  const executionMode = resolveExecutionMode({
+    env: process.env,
+    config: configState.config,
+  });
   const globalPath = globalCredentialsPath();
   const credentialEnv = await readCredentialEnv(cwd, globalPath);
   const env = credentialEnv.env;
   checks.push(...(await globalCredentialsChecks(globalPath, credentialEnv)));
   const codexAuthFileAvailable = await readable(join(codexHomePath(), "auth.json"));
-  for (const provider of agentProvidersInUse(agents)) {
+  const agyAuthAvailable = !providers.has("agy")
+    ? false
+    : executionMode === "direct"
+      ? (await runCommand("agy", ["--help"], cwd)).exitCode === 0
+      : docker.exitCode === 0 &&
+        (await runCommand("docker", ["volume", "inspect", defaultAgyAuthVolumeName], cwd))
+          .exitCode === 0;
+  for (const provider of providers) {
     checks.push(
       agentAuthCheck(provider, {
-        available: hasAgentCredentials(provider, { env, codexAuthFileAvailable }),
+        available: hasAgentCredentials(provider, {
+          env,
+          codexAuthFileAvailable,
+          agyAuthAvailable,
+        }),
         globalPath,
       }),
     );
@@ -144,6 +161,10 @@ export async function doctorProject(
         codexAuthFilePath: codexAuthFileAvailable
           ? join(codexHomePath(), "auth.json")
           : undefined,
+        agyAuthVolumeName:
+          executionMode === "docker" && agyAuthAvailable
+            ? defaultAgyAuthVolumeName
+            : undefined,
         dockerAvailable: docker.exitCode === 0,
         globalPath,
         runCommand,
@@ -181,6 +202,7 @@ async function agentProbeChecks(input: {
   env: Record<string, string>;
   agents: AgentProviderByRole;
   codexAuthFilePath: string | undefined;
+  agyAuthVolumeName: string | undefined;
   dockerAvailable: boolean;
   globalPath: string;
   runCommand: DoctorCommandRunner;
@@ -206,6 +228,7 @@ async function agentProbeChecks(input: {
       env: input.env,
       agents: input.agents,
       codexAuthFilePath: input.codexAuthFilePath,
+      agyAuthVolumeName: input.agyAuthVolumeName,
     });
     // The prompt goes on stdin as in a run, so the probe checks that path too.
     const probe = agentShellCommand(agent, {
@@ -220,6 +243,7 @@ async function agentProbeChecks(input: {
         image,
         env: credentials.env,
         codexAuthFilePath: credentials.codexAuthFilePath,
+        agyAuthVolumeName: credentials.agyAuthVolumeName,
         command: `cd "$(mktemp -d)" && git init -q && ${probe.command}`,
         interactive: true,
       }),
@@ -276,11 +300,20 @@ function probeFailureMessage(input: {
   const code = agentFailureCode(input.agent.provider, input.result);
   switch (code) {
     case "agent_auth_failed":
-      return input.agent.provider === "claude"
-        ? `Claude Code rejected its credentials. Run \`claude setup-token\` and update CLAUDE_CODE_OAUTH_TOKEN in ${input.globalPath}.`
-        : `Codex rejected its credentials. Check OPENAI_API_KEY in ${input.globalPath}, or run \`codex login\`.`;
+      switch (input.agent.provider) {
+        case "claude":
+          return `Claude Code rejected its credentials. Run \`claude setup-token\` and update CLAUDE_CODE_OAUTH_TOKEN in ${input.globalPath}.`;
+        case "codex":
+          return `Codex rejected its credentials. Check OPENAI_API_KEY in ${input.globalPath}, or run \`codex login\`.`;
+        case "agy":
+          return "Antigravity CLI rejected its credentials. Run `agent-cage auth agy` to sign in.";
+        default: {
+          const exhaustiveProvider: never = input.agent.provider;
+          return exhaustiveProvider;
+        }
+      }
     case "agent_rate_limited":
-      return claudeRateLimitMessage(input.result.stdout);
+      return agentRateLimitMessage(input.agent.provider, input.result);
     case "agent_model_unavailable":
       return [
         `${input.label} is not available to this account, or the CLI in ${input.image} is too old for it.`,
@@ -359,6 +392,13 @@ function agentAuthCheck(
             "claude-auth",
             `Run \`claude setup-token\` and set CLAUDE_CODE_OAUTH_TOKEN (or ANTHROPIC_API_KEY) in ${input.globalPath}.`,
           );
+    case "agy":
+      return input.available
+        ? pass("agy-auth", "Antigravity CLI authentication volume is available locally.")
+        : warning(
+            "agy-auth",
+            "Run `agent-cage auth agy` to sign in inside the Docker auth volume.",
+          );
     default: {
       const exhaustiveProvider: never = provider;
       return exhaustiveProvider;
@@ -410,6 +450,16 @@ async function checkActions(
   checks: DoctorCheck[],
   runCommand: DoctorCommandRunner,
 ): Promise<void> {
+  if (agentProvidersInUse(agents).has("agy")) {
+    checks.push(
+      fail(
+        "agy-actions",
+        "Antigravity CLI (agy) uses a local Docker auth volume and is not supported in GitHub Actions; disable actions or use claude/codex.",
+      ),
+    );
+    return;
+  }
+
   const workflowPath = resolve(cwd, actions.workflow);
   const workflow = await readOptionalFile(workflowPath);
   checks.push(

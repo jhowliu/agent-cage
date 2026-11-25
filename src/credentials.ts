@@ -29,11 +29,13 @@ export type CredentialPolicyInput = {
   env: Record<string, string>;
   agents: AgentProviderByRole;
   codexAuthFilePath?: string | null | undefined;
+  agyAuthVolumeName?: string | null | undefined;
 };
 
 export type CommandCredentials = {
   env: Record<string, string>;
   codexAuthFilePath?: string | undefined;
+  agyAuthVolumeName?: string | undefined;
 };
 
 export type RunCredentialsInput = {
@@ -41,6 +43,7 @@ export type RunCredentialsInput = {
   agents: AgentProviderByRole;
   readEnv: (cwd: string) => Promise<Record<string, string>>;
   findCodexAuthFile: () => Promise<string | null>;
+  findAgyAuthVolume?: (() => Promise<string | null>) | undefined;
   findGithubToken: GithubTokenLookup;
 };
 
@@ -51,14 +54,18 @@ export class RunCredentials {
 
   readonly #codexAuthFilePath: string | null;
 
+  readonly #agyAuthVolumeName: string | null;
+
   constructor(input: {
     secrets: Record<string, string>;
     agents: AgentProviderByRole;
     codexAuthFilePath: string | null;
+    agyAuthVolumeName?: string | null | undefined;
   }) {
     this.secrets = input.secrets;
     this.#agents = input.agents;
     this.#codexAuthFilePath = input.codexAuthFilePath;
+    this.#agyAuthVolumeName = input.agyAuthVolumeName ?? null;
   }
 
   issueOptions(comments: CommentSelection): FetchIssueContextOptions {
@@ -86,6 +93,7 @@ export class RunCredentials {
       env: this.secrets,
       agents: this.#agents,
       codexAuthFilePath: this.#codexAuthFilePath,
+      agyAuthVolumeName: this.#agyAuthVolumeName,
     });
   }
 
@@ -100,6 +108,7 @@ export class RunCredentials {
 
 const codexEnvNames: ReadonlySet<string> = new Set(agentCredentialEnvNames.codex);
 const claudeEnvNames: ReadonlySet<string> = new Set(agentCredentialEnvNames.claude);
+const agyEnvNames: ReadonlySet<string> = new Set(agentCredentialEnvNames.agy);
 const githubEnvNames: ReadonlySet<string> = new Set(["GITHUB_TOKEN", "GH_TOKEN"]);
 const issueTrackerEnvNames: ReadonlySet<string> = new Set(["LINEAR_API_KEY"]);
 
@@ -108,12 +117,21 @@ export async function prepareRunCredentials(
 ): Promise<RunCredentials> {
   const env = normalizeCredentialEnv(await input.readEnv(input.cwd));
   const secrets = await withGithubToken(env, input.findGithubToken);
+  const providers = agentProvidersInUse(input.agents);
   const needsCodexAuthFile =
-    agentProvidersInUse(input.agents).has("codex") &&
-    secrets.OPENAI_API_KEY === undefined;
+    providers.has("codex") && secrets.OPENAI_API_KEY === undefined;
   const codexAuthFilePath = needsCodexAuthFile ? await input.findCodexAuthFile() : null;
+  const agyAuthVolumeName =
+    providers.has("agy") && input.findAgyAuthVolume !== undefined
+      ? await input.findAgyAuthVolume()
+      : null;
 
-  return new RunCredentials({ secrets, agents: input.agents, codexAuthFilePath });
+  return new RunCredentials({
+    secrets,
+    agents: input.agents,
+    codexAuthFilePath,
+    agyAuthVolumeName,
+  });
 }
 
 /**
@@ -192,13 +210,19 @@ export function issueCredentialEnv(env: Record<string, string>): Record<string, 
 
 export function hasAgentCredentials(
   provider: AgentProvider,
-  input: { env: Record<string, string>; codexAuthFileAvailable: boolean },
+  input: {
+    env: Record<string, string>;
+    codexAuthFileAvailable: boolean;
+    agyAuthAvailable?: boolean | undefined;
+  },
 ): boolean {
   switch (provider) {
     case "codex":
       return input.env.OPENAI_API_KEY !== undefined || input.codexAuthFileAvailable;
     case "claude":
       return agentCredentialEnvNames.claude.some((name) => input.env[name] !== undefined);
+    case "agy":
+      return input.agyAuthAvailable === true;
     default: {
       const exhaustiveProvider: never = provider;
       return exhaustiveProvider;
@@ -213,6 +237,7 @@ export function hasAgentCredentials(
 export const globalCredentialNames = [
   ...agentCredentialEnvNames.codex,
   ...agentCredentialEnvNames.claude,
+  ...agentCredentialEnvNames.agy,
   "LINEAR_API_KEY",
 ] as const;
 
@@ -293,6 +318,8 @@ function agentCredentials(
       return codexCredentials(input);
     case "claude":
       return { env: pickEnv(input.env, claudeEnvNames) };
+    case "agy":
+      return agyCredentials(input);
     default: {
       const exhaustiveProvider: never = provider;
       return exhaustiveProvider;
@@ -313,10 +340,22 @@ function codexCredentials(input: CredentialPolicyInput): CommandCredentials {
   };
 }
 
+function agyCredentials(input: CredentialPolicyInput): CommandCredentials {
+  const env = pickEnv(input.env, agyEnvNames);
+
+  return {
+    env,
+    ...(input.agyAuthVolumeName === null || input.agyAuthVolumeName === undefined
+      ? {}
+      : { agyAuthVolumeName: input.agyAuthVolumeName }),
+  };
+}
+
 function nonCredentialEnv(env: Record<string, string>): Record<string, string> {
   const credentialNames = new Set([
     ...codexEnvNames,
     ...claudeEnvNames,
+    ...agyEnvNames,
     ...githubEnvNames,
     ...issueTrackerEnvNames,
   ]);

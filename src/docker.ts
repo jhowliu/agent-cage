@@ -1,4 +1,5 @@
 import { ExecaError, execa } from "execa";
+import { agyAuthMountTarget, commandWithAgyKeyring } from "./agent/agy.js";
 import { RunFailureError } from "./run/errors.js";
 
 export type DockerRunner = {
@@ -32,6 +33,7 @@ export type DockerSandboxOptions = {
 export type DockerCommandOptions = {
   env?: Record<string, string>;
   codexAuthFilePath?: string | undefined;
+  agyAuthVolumeName?: string | undefined;
   // Live output sink: receives stdout/stderr chunks as the command runs.
   onData?: ((chunk: string) => void) | undefined;
   timeoutMs?: number | undefined;
@@ -204,6 +206,7 @@ export function createDockerSandbox(
           labels,
           env,
           codexAuthFilePath: commandOptions.codexAuthFilePath,
+          agyAuthVolumeName: commandOptions.agyAuthVolumeName,
           command,
         }),
         { env },
@@ -387,6 +390,7 @@ type DockerRunArgsInput = {
   labels: Record<string, string>;
   env: Record<string, string>;
   codexAuthFilePath?: string | undefined;
+  agyAuthVolumeName?: string | undefined;
   command: string;
   /** Keeps stdin open so the command can read DockerCommandOptions.input. */
   interactive?: boolean | undefined;
@@ -407,6 +411,7 @@ export function dockerRunArgs(input: DockerRunArgsInput): string[] {
     "--user",
     "agent",
     ...codexAuthMountArgs(input.codexAuthFilePath),
+    ...agyAuthMountArgs(input.agyAuthVolumeName),
     ...envArgs(input.env),
     input.image,
     "sh",
@@ -419,6 +424,7 @@ export type DockerOneShotArgsInput = {
   image: string;
   env: Record<string, string>;
   codexAuthFilePath?: string | undefined;
+  agyAuthVolumeName?: string | undefined;
   command: string;
   interactive?: boolean | undefined;
 };
@@ -437,12 +443,17 @@ export function dockerOneShotArgs(input: DockerOneShotArgsInput): string[] {
     "--user",
     "agent",
     ...codexAuthMountArgs(input.codexAuthFilePath),
+    ...agyAuthMountArgs(input.agyAuthVolumeName),
     ...envArgs(input.env),
     input.image,
     "sh",
     "-lc",
     commandWithGitHubAuth(
-      commandWithCodexAuth(input.command, input.codexAuthFilePath, input.env),
+      commandWithCodexAuth(
+        commandWithAgyAuth(input.command, input.agyAuthVolumeName),
+        input.codexAuthFilePath,
+        input.env,
+      ),
       input.env,
     ),
   ];
@@ -454,7 +465,11 @@ function interactiveArgs(interactive: boolean | undefined): string[] {
 
 function commandWithAuth(command: string, input: DockerRunArgsInput): string {
   return commandWithGitHubAuth(
-    commandWithCodexAuth(command, input.codexAuthFilePath, input.env),
+    commandWithCodexAuth(
+      commandWithAgyAuth(command, input.agyAuthVolumeName),
+      input.codexAuthFilePath,
+      input.env,
+    ),
     input.env,
   );
 }
@@ -468,6 +483,28 @@ function codexAuthMountArgs(codexAuthFilePath: string | undefined): string[] {
     "--mount",
     `type=bind,source=${codexAuthFilePath},target=/tmp/codex-auth.json,readonly`,
   ];
+}
+
+function agyAuthMountArgs(agyAuthVolumeName: string | undefined): string[] {
+  if (agyAuthVolumeName === undefined) {
+    return [];
+  }
+
+  return [
+    "--mount",
+    `type=volume,source=${agyAuthVolumeName},target=${agyAuthMountTarget}`,
+  ];
+}
+
+function commandWithAgyAuth(
+  command: string,
+  agyAuthVolumeName: string | undefined,
+): string {
+  if (agyAuthVolumeName === undefined) {
+    return command;
+  }
+
+  return commandWithAgyKeyring(command);
 }
 
 function commandWithCodexAuth(

@@ -8,9 +8,12 @@ RUN apt-get update \
     bubblewrap \
     ca-certificates \
     curl \
+    dbus-x11 \
     git \
+    gnome-keyring \
     gnupg \
     jq \
+    libsecret-tools \
     openssh-client \
   && mkdir -p /etc/apt/keyrings \
   && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
@@ -25,10 +28,12 @@ RUN apt-get update \
     "@openai/codex@${CODEX_CLI_VERSION}" \
     "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
   && npm cache clean --force \
+  && curl -fsSL https://antigravity.google/cli/install.sh | bash -s -- --dir /usr/local/bin \
+  && chmod 755 /usr/local/bin/agy \
   && groupadd --gid 10001 agent \
   && useradd --uid 10001 --gid 10001 --create-home --shell /bin/bash agent \
-  && mkdir -p /workspace \
-  && chown agent:agent /workspace \
+  && mkdir -p /workspace /home/agent/.agent-cage-agy-auth \
+  && chown -R agent:agent /workspace /home/agent/.agent-cage-agy-auth \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
