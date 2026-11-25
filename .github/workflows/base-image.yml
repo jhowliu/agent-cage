@@ -6,7 +6,7 @@ on:
       image_version:
         description: Image version tag to publish.
         required: true
-        default: "0.1.2"
+        default: "0.1.3"
       codex_cli_version:
         description: Exact @openai/codex version to install.
         required: true

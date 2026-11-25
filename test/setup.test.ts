@@ -559,10 +559,10 @@ test("setup --yes detects a Go project and generates a runtime Dockerfile", asyn
     assert.deepEqual(config.setup, ["go mod download"]);
     assert.deepEqual(config.verify, ["go test ./..."]);
     assert.deepEqual(config.runtime, {
-      image: "ghcr.io/jhowliu/agent-cage/base:0.1.2",
+      image: "ghcr.io/jhowliu/agent-cage/base:0.1.3",
       dockerfile: ".agent-cage/Dockerfile",
     });
-    assert.match(dockerfile, /^FROM ghcr\.io\/jhowliu\/agent-cage\/base:0\.1\.2$/m);
+    assert.match(dockerfile, /^FROM ghcr\.io\/jhowliu\/agent-cage\/base:0\.1\.3$/m);
     assert.match(dockerfile, /COPY --from=golang:1-bookworm/);
     assert.ok(result.created.includes(".agent-cage/Dockerfile"));
     assert.ok(result.notices.some((notice) => notice.includes("pin its image tags")));
@@ -584,7 +584,7 @@ test("setup references an existing runtime Dockerfile without overwriting it", a
     );
     assert.ok(!result.created.includes(".agent-cage/Dockerfile"));
     assert.deepEqual((await readConfig(cwd)).runtime, {
-      image: "ghcr.io/jhowliu/agent-cage/base:0.1.2",
+      image: "ghcr.io/jhowliu/agent-cage/base:0.1.3",
       dockerfile: ".agent-cage/Dockerfile",
     });
   } finally {
