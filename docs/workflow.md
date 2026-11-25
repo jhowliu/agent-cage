@@ -407,6 +407,7 @@ For automation, `agent-cage run` emits a deterministic outcome so a workflow can
 | `setup_failed`                      | A `setup` command failed.                                                                                                       |
 | `agent_auth_failed`                 | Claude Code or Codex rejected its credentials (HTTP 401/403). Renew the token in `~/.config/agent-cage/env` or the Codex login. |
 | `agent_model_unavailable`           | The configured `agent.*.model` does not exist or is not available to this account.                                              |
+| `agent_rate_limited`                | Claude Code reached its account usage limit. Rerun after the reported reset time, or use `ANTHROPIC_API_KEY` for API billing.   |
 | `implement_failed`, `review_failed` | The implementation or review agent failed for another reason, or the review output was not a valid report.                      |
 | `verify_failed`                     | Verification still failed after `max_iterations`.                                                                               |
 | `review_blocking`                   | The review still blocked after `max_review_cycles`, or the reviewer changed the diff.                                           |

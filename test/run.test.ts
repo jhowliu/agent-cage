@@ -1873,6 +1873,7 @@ async function runFailingCase(input: {
   config: string;
   runId: string;
   results: [string, CommandResult][];
+  summaryContains?: string;
 }): Promise<{ failureCode: FailureCode | null; lastPhase: string | undefined }> {
   const cwd = await createProject(input.config);
   const events: string[] = [];
@@ -1901,6 +1902,13 @@ async function runFailingCase(input: {
     const details = store.getRunDetails(input.runId);
     store.close();
     assert.equal(details.run.failureCode, result.failureCode);
+    if (input.summaryContains !== undefined) {
+      const summary = await readFile(
+        join(cwd, ".agent-cage", "runs", input.runId, "summary.md"),
+        "utf8",
+      );
+      assert.ok(summary.includes(input.summaryContains));
+    }
     return { failureCode: result.failureCode, lastPhase: details.phases.at(-1)?.name };
   } finally {
     await rm(cwd, { recursive: true, force: true });
@@ -2556,3 +2564,26 @@ agent:
     });
   }
 }
+
+test("runAgentCage reports Claude usage limits with the reset time in its summary", async () => {
+  const outcome = await runFailingCase({
+    config: "verify:\n  - npm test\nagent:\n  implement:\n    provider: claude\n",
+    runId: "run-test-claude-limit",
+    results: [
+      ["git fetch origin", commandResult()],
+      [
+        "claude -p",
+        commandResult(
+          '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1795505400,"rateLimitType":"five_hour","overageStatus":"rejected"}}',
+          1,
+        ),
+      ],
+    ],
+    summaryContains:
+      "Claude Code reached its five_hour usage limit; it resets at 2026-11-24T07:30:00.000Z. Rerun after that, or use ANTHROPIC_API_KEY for API billing.",
+  });
+  assert.deepEqual(outcome, {
+    failureCode: "agent_rate_limited",
+    lastPhase: "implement",
+  });
+});

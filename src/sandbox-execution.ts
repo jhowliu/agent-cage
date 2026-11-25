@@ -1,3 +1,4 @@
+import { claudeRateLimitMessage } from "./agent/claude.js";
 import { execa } from "execa";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -443,9 +444,12 @@ export function agentCommandFailure(
   result: CommandResult,
 ): RunFailureError {
   if (result.exitCode === 124) return new RunFailureError("timeout", log);
+  const code = agentFailureCode(provider, result) ?? roleFailureCodes[role];
   return new RunFailureError(
-    agentFailureCode(provider, result) ?? roleFailureCodes[role],
-    log,
+    code,
+    code === "agent_rate_limited"
+      ? `${claudeRateLimitMessage(result.stdout)}\n\n${log}`
+      : log,
   );
 }
 

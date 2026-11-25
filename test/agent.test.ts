@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   claudeExecCommand,
   claudeFailureCode,
+  claudeRateLimitInfo,
   extractClaudeResult,
 } from "../src/agent/claude.js";
 import { codexConfigModel, codexFailureCode } from "../src/agent/codex.js";
@@ -201,4 +202,31 @@ test("codexConfigModel reads the top-level model only", () => {
   );
   assert.equal(codexConfigModel('[profiles.fast]\nmodel = "other"\n'), null);
   assert.equal(codexConfigModel('approval_policy = "never"\n'), null);
+});
+
+const rateLimitEvent =
+  '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1795505400,"rateLimitType":"five_hour","overageStatus":"rejected"}}';
+
+test("Claude rejected usage limits retain reset details and defer to credential and model errors", () => {
+  assert.equal(claudeFailureCode(rateLimitEvent), "agent_rate_limited");
+  assert.deepEqual(claudeRateLimitInfo(rateLimitEvent), {
+    rateLimitType: "five_hour",
+    resetsAt: "2026-11-24T07:30:00.000Z",
+  });
+  for (const [error, code] of [
+    ["authentication_failed", "agent_auth_failed"],
+    ["model_not_found", "agent_model_unavailable"],
+  ]) {
+    assert.equal(
+      claudeFailureCode(`${rateLimitEvent}\n${JSON.stringify({ error })}`),
+      code,
+    );
+  }
+  assert.equal(claudeFailureCode(rateLimitEvent.replaceAll("rejected", "allowed")), null);
+  assert.equal(claudeRateLimitInfo("not json"), null);
+  assert.equal(
+    claudeRateLimitInfo(rateLimitEvent.replace("1795505400", '"invalid"')),
+    null,
+  );
+  assert.equal(claudeRateLimitInfo(rateLimitEvent.replace("1795505400", "1e100")), null);
 });

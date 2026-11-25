@@ -44,6 +44,7 @@ export const failureCodes = [
   "clone_failed",
   "agent_auth_failed",
   "agent_model_unavailable",
+  "agent_rate_limited",
   "implement_failed",
   "review_failed",
   "verify_failed",
