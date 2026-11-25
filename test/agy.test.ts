@@ -20,6 +20,7 @@ import {
 } from "../src/agent/providers.js";
 import {
   agyAuthVolumeLabel,
+  agyOAuthTokenPath,
   checkAgyAuthStatus,
   loginAgyAuth,
   logoutAgyAuth,
@@ -394,11 +395,14 @@ test("loginAgyAuth labels volume without agent-cage.managed and cleans up aborte
         return { exitCode: 0, stdout: defaultAgyAuthVolumeName, stderr: "" };
       }
       const script = args.at(-1) ?? "";
-      if (script.includes("secret-tool lookup")) {
-        // agy stores its token with zalando/go-keyring, whose Secret Service
-        // attributes are `service` and `username` (not the macOS `account`).
-        return script.includes("secret-tool lookup service gemini username antigravity")
-          ? { exitCode: 0, stdout: "token", stderr: "" }
+      // In a container agy saves its token to a file in the volume, not to the
+      // keyring, so only a check of that file proves the login was kept.
+      if (script.includes("secret-tool")) {
+        return { exitCode: 1, stdout: "", stderr: "" };
+      }
+      if (script.includes("antigravity-oauth-token")) {
+        return script === `test -s ${agyOAuthTokenPath}`
+          ? { exitCode: 0, stdout: "", stderr: "" }
           : { exitCode: 1, stdout: "", stderr: "" };
       }
       return { exitCode: 0, stdout: "", stderr: "" };
