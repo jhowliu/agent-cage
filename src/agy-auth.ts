@@ -102,7 +102,7 @@ export async function checkAgyAuthStatus(
     "sh",
     "-lc",
     commandWithAgyKeyring(
-      "secret-tool lookup service gemini account antigravity >/dev/null 2>&1",
+      "secret-tool lookup service gemini username antigravity >/dev/null 2>&1",
     ),
   ]);
 

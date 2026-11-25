@@ -393,6 +393,14 @@ test("loginAgyAuth labels volume without agent-cage.managed and cleans up aborte
         volumePresent = false;
         return { exitCode: 0, stdout: defaultAgyAuthVolumeName, stderr: "" };
       }
+      const script = args.at(-1) ?? "";
+      if (script.includes("secret-tool lookup")) {
+        // agy stores its token with zalando/go-keyring, whose Secret Service
+        // attributes are `service` and `username` (not the macOS `account`).
+        return script.includes("secret-tool lookup service gemini username antigravity")
+          ? { exitCode: 0, stdout: "token", stderr: "" }
+          : { exitCode: 1, stdout: "", stderr: "" };
+      }
       return { exitCode: 0, stdout: "", stderr: "" };
     });
 
