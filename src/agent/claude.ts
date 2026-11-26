@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { shellQuote } from "../shell.js";
-import type { AgentFailureCode } from "./providers.js";
+import type { AgentEffort, AgentFailureCode } from "./providers.js";
 
 // Tools the read-only reviewer may use. In print mode Claude Code denies any
 // tool outside this list instead of prompting.
@@ -17,10 +17,11 @@ export const claudeReviewAllowedTools = [
 const claudeEditTools = ["Edit", "Write", "NotebookEdit"] as const;
 
 export type ClaudeCommandInput =
-  | { access: "workspace-write"; model: string }
+  | { access: "workspace-write"; model: string; effort?: AgentEffort | undefined }
   | {
       access: "read-only";
       model: string;
+      effort?: AgentEffort | undefined;
       outputSchema: Record<string, unknown>;
     };
 
@@ -32,6 +33,9 @@ export function claudeOptionArgs(input: ClaudeCommandInput): string[] {
   // stream-json keeps output flowing during long turns, so the idle timeout
   // only fires when Claude Code is actually stuck. It requires --verbose.
   const args = ["--model", input.model, "--output-format", "stream-json", "--verbose"];
+  if (input.effort !== undefined) {
+    args.push("--effort", input.effort);
+  }
 
   switch (input.access) {
     case "workspace-write":

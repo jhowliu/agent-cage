@@ -1,4 +1,5 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
+import { agentEfforts, type AgentEffort } from "./agent/providers.js";
 import { checkAgyAuthStatus, loginAgyAuth, logoutAgyAuth } from "./agy-auth.js";
 import { cleanupEvidenceBranches } from "./cleanup-evidence.js";
 import { writeFile } from "node:fs/promises";
@@ -202,6 +203,7 @@ export function createCli(dependencies: CliDependencies = {}): Command {
     .option("--repo <repo>", "target GitHub repository override")
     .option("--base <branch>", "base branch override")
     .option("--model <model>", "implementation agent model override")
+    .addOption(effortOption())
     .option("--draft", "create a draft pull request")
     .option("--run-id <id>", "use a supplied Run identifier")
     .option(
@@ -220,6 +222,7 @@ export function createCli(dependencies: CliDependencies = {}): Command {
           repo?: string;
           base?: string;
           model?: string;
+          effort?: AgentEffort;
           draft?: boolean;
           resultJson?: string;
           verbose?: boolean;
@@ -242,6 +245,7 @@ export function createCli(dependencies: CliDependencies = {}): Command {
                 repo: options.repo,
                 base: options.base,
                 model: options.model,
+                effort: options.effort,
                 draft: options.draft,
                 verbose: isVerbose(options.verbose) ? true : undefined,
               }),
@@ -262,6 +266,7 @@ export function createCli(dependencies: CliDependencies = {}): Command {
       "feedback to address besides what the pull request holds",
     )
     .option("--model <model>", "implementation agent model override")
+    .addOption(effortOption())
     .option("--run-id <id>", "use a supplied Run identifier")
     .option(
       "--result-json <path>",
@@ -278,6 +283,7 @@ export function createCli(dependencies: CliDependencies = {}): Command {
           feedback?: string;
           runId?: string;
           model?: string;
+          effort?: AgentEffort;
           resultJson?: string;
           verbose?: boolean;
         },
@@ -291,6 +297,7 @@ export function createCli(dependencies: CliDependencies = {}): Command {
                 feedback: options.feedback,
                 runId: options.runId,
                 model: options.model,
+                effort: options.effort,
                 verbose: isVerbose(options.verbose) ? true : undefined,
               }),
               { onProgress },
@@ -718,4 +725,10 @@ function colorEnabled(stream: NodeJS.WriteStream): boolean {
   }
 
   return stream.isTTY === true;
+}
+
+function effortOption(): Option {
+  return new Option("--effort <level>", "implementation agent effort override").choices(
+    agentEfforts,
+  );
 }

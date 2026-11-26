@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { shellQuote } from "../shell.js";
-import type { AgentFailureCode } from "./providers.js";
+import type { AgentEffort, AgentFailureCode } from "./providers.js";
 
 export const defaultAgyAuthVolumeName = "agent-cage-agy-auth";
 export const agyAuthMountTarget = "/home/agent/.agent-cage-agy-auth";
@@ -63,11 +63,13 @@ export type AgyCommandInput =
   | {
       access: "workspace-write";
       model: string;
+      effort?: AgentEffort | undefined;
       sandbox?: boolean | undefined;
     }
   | {
       access: "read-only";
       model: string;
+      effort?: AgentEffort | undefined;
       outputSchema: string;
     };
 
@@ -87,6 +89,10 @@ export function agyOptionArgs(input: AgyCommandInput): string[] {
     "--output-format",
     "stream-json",
   ];
+  // The session setting; the model name (such as gemini-4-neon-high) is not rewritten.
+  if (input.effort !== undefined) {
+    args.push("--effort", input.effort);
+  }
 
   switch (input.access) {
     case "workspace-write":
@@ -129,11 +135,13 @@ export function agyExecCommand(
     | {
         access: "workspace-write";
         model: string;
+        effort?: AgentEffort | undefined;
         sandbox?: boolean | undefined;
       }
     | {
         access: "read-only";
         model: string;
+        effort?: AgentEffort | undefined;
         outputSchema: Record<string, unknown>;
       },
 ): string {
@@ -144,6 +152,7 @@ export function agyExecCommand(
         ...agyOptionArgs({
           access: "workspace-write",
           model: input.model,
+          effort: input.effort,
           sandbox: input.sandbox,
         }).map(shellQuote),
       ].join(" ");
@@ -156,6 +165,7 @@ export function agyExecCommand(
         ...agyOptionArgs({
           access: "read-only",
           model: input.model,
+          effort: input.effort,
           outputSchema: agyOutputSchemaPath,
         }).map(shellQuote),
       ].join(" ");

@@ -228,3 +228,31 @@ test("config schema rejects unknown agent providers", () => {
     /provider/,
   );
 });
+
+test("agent effort parses for implement and review and resolves to undefined when omitted", () => {
+  const withEffort = agentCageConfigSchema.parse({
+    verify: ["npm test"],
+    agent: {
+      implement: { provider: "claude", effort: "high" },
+      review: { provider: "codex", model: "gpt-6-luna", effort: "xhigh" },
+    },
+  });
+  assert.equal(withEffort.agent.implement.effort, "high");
+  assert.equal(withEffort.agent.review.effort, "xhigh");
+
+  const without = agentCageConfigSchema.parse({ verify: ["npm test"] });
+  assert.equal(without.agent.implement.effort, undefined);
+  assert.equal(without.agent.review.effort, undefined);
+});
+
+test("agent effort rejects unknown levels and names the allowed values", () => {
+  const result = agentCageConfigSchema.safeParse({
+    verify: ["npm test"],
+    agent: { implement: { provider: "claude", effort: "extreme" } },
+  });
+  assert.equal(result.success, false);
+  const message = JSON.stringify(result.error?.issues);
+  for (const level of ["low", "medium", "high", "xhigh", "max"]) {
+    assert.ok(message.includes(level), level);
+  }
+});

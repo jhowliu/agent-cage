@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  agentEfforts,
   agentProviders,
   defaultAgentModels,
   type AgentAssignment,
@@ -9,6 +10,7 @@ import { defaultSandboxImage } from "./docker.js";
 const agentAssignmentSchema = z.object({
   provider: z.enum(agentProviders),
   model: z.string().min(1).optional(),
+  effort: z.enum(agentEfforts).optional(),
 });
 
 /**
@@ -25,7 +27,9 @@ function resolveAgentAssignment(
     (provider === "codex" ? legacyCodexModel : undefined) ??
     defaultAgentModels[provider];
 
-  return { provider, model };
+  return assignment?.effort === undefined
+    ? { provider, model }
+    : { provider, model, effort: assignment.effort };
 }
 
 const actionsRuntimeSchema = z.object({

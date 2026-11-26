@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
   blockingReviewFeedback,
   buildReviewPrompt,
+  execaReviewAgentRunner,
   parseReviewReport,
   reviewReportJsonSchema,
   reviewNextAction,
@@ -347,4 +351,49 @@ test("runIndependentReview fails if the read-only review changes the diff", asyn
       }),
     { name: "ReviewModifiedDiffError" },
   );
+});
+
+test("host review runners pass effort to each CLI", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "agent-cage-review-effort-"));
+  try {
+    for (const provider of ["codex", "claude", "agy"] as const) {
+      const log = join(dir, `${provider}.log`);
+      const script = join(dir, provider);
+      await writeFile(
+        script,
+        `#!/bin/sh\nprintf '%s\\n' "$@" > ${log}\ncat > /dev/null\necho '{"type":"result","is_error":false,"result":"ok"}'\necho '{"event":"result","result":{"status":"SUCCESS","response":"ok"}}'\n`,
+        { mode: 0o755 },
+      );
+    }
+    const env = { PATH: `${dir}:${process.env.PATH ?? ""}` };
+    const run = async (
+      provider: "codex" | "claude" | "agy",
+      effort: "xhigh" | undefined,
+    ): Promise<string[]> => {
+      await execaReviewAgentRunner.run({
+        cwd: dir,
+        agent:
+          effort === undefined
+            ? { provider, model: "m" }
+            : { provider, model: "m", effort },
+        prompt: "p",
+        outputSchema: {},
+        env,
+      });
+      return (await readFile(join(dir, `${provider}.log`), "utf8")).split("\n");
+    };
+
+    const codexArgs = await run("codex", "xhigh");
+    const at = codexArgs.indexOf("-c");
+    assert.equal(codexArgs[at + 1], 'model_reasoning_effort="xhigh"');
+    assert.ok(!(await run("codex", undefined)).includes("-c"));
+
+    for (const provider of ["claude", "agy"] as const) {
+      const args = await run(provider, "xhigh");
+      assert.equal(args[args.indexOf("--effort") + 1], "xhigh");
+      assert.ok(!(await run(provider, undefined)).includes("--effort"));
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });

@@ -492,3 +492,54 @@ test("runs list in a repository without runs creates no state and prints no warn
     await rm(cwd, { recursive: true, force: true });
   }
 });
+
+test("run and revise pass --effort, and an unknown level is a usage error", async () => {
+  const runCalls: RunCommandOptions[] = [];
+  const reviseCalls: ReviseCommandOptions[] = [];
+  const originalConsoleLog = console.log;
+  const originalExitCode = process.exitCode;
+  const build = () => {
+    const program = createCli({
+      runAgentCage: async (input): Promise<RunAgentCageResult> => {
+        runCalls.push(input);
+        return { runId: "r", status: "failed", failureCode: null, prUrl: null };
+      },
+      reviseAgentCagePullRequest: async (input): Promise<RunAgentCageResult> => {
+        reviseCalls.push(input);
+        return { runId: "r", status: "failed", failureCode: null, prUrl: null };
+      },
+    });
+    // Subcommands copy these settings at creation, so set them on each one too.
+    for (const command of [program, ...program.commands]) {
+      command.exitOverride();
+      command.configureOutput({ writeOut: () => undefined, writeErr: () => undefined });
+    }
+    return program;
+  };
+  console.log = () => undefined;
+
+  try {
+    await build().parseAsync(
+      ["run", "https://github.com/jhowliu/agent-cage/issues/1", "--effort", "medium"],
+      { from: "user" },
+    );
+    await build().parseAsync(
+      ["revise", "https://github.com/jhowliu/agent-cage/pull/2", "--effort", "medium"],
+      { from: "user" },
+    );
+    await assert.rejects(
+      build().parseAsync(
+        ["run", "https://github.com/jhowliu/agent-cage/issues/1", "--effort", "extreme"],
+        { from: "user" },
+      ),
+      /xhigh/,
+    );
+  } finally {
+    console.log = originalConsoleLog;
+    process.exitCode = originalExitCode;
+  }
+
+  assert.equal(runCalls[0]?.effort, "medium");
+  assert.equal(reviseCalls[0]?.effort, "medium");
+  assert.equal(runCalls.length, 1);
+});

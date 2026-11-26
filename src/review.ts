@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { execa } from "execa";
 import { z } from "zod";
 import { agyOptionArgs, extractAgyResult } from "./agent/agy.js";
+import { codexEffortConfig } from "./agent/codex.js";
 import { claudeOptionArgs, extractClaudeResult } from "./agent/claude.js";
 import type { AgentAssignment } from "./agent/providers.js";
 import { RunFailureError } from "./run/errors.js";
@@ -211,6 +212,7 @@ async function runAgyReviewOnHost(input: ReviewAgentRunInput): Promise<string> {
     const args = agyOptionArgs({
       access: "read-only",
       model: input.agent.model,
+      effort: input.agent.effort,
       outputSchema: outputSchemaPath,
     });
     const result = await execa("agy", args, {
@@ -239,6 +241,9 @@ async function runCodexReviewOnHost(input: ReviewAgentRunInput): Promise<string>
       "exec",
       "--model",
       input.agent.model,
+      ...(input.agent.effort === undefined
+        ? []
+        : ["-c", codexEffortConfig(input.agent.effort)]),
       "--sandbox",
       "read-only",
       "--cd",
@@ -264,6 +269,7 @@ async function runClaudeReviewOnHost(input: ReviewAgentRunInput): Promise<string
     ...claudeOptionArgs({
       access: "read-only",
       model: input.agent.model,
+      effort: input.agent.effort,
       outputSchema: input.outputSchema,
     }),
   ];
