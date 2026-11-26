@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Claude implementation runs headless with permissions bypassed and streaming output" time="0.000676" classname="test"/>
+	<testcase name="Claude review is limited to read-only tools and a JSON schema" time="0.000154" classname="test"/>
+	<testcase name="Codex commands keep the sandbox flag in Docker mode and bypass it in direct mode" time="0.000158" classname="test"/>
+	<testcase name="Codex review writes the output schema before running read-only" time="0.000118" classname="test"/>
+	<testcase name="agent commands take the prompt on stdin, never as an argument" time="0.002041" classname="test"/>
+	<testcase name="extractClaudeResult prefers structured output over result text" time="0.001077" classname="test"/>
+	<testcase name="extractClaudeResult falls back to result text" time="0.000131" classname="test"/>
+	<testcase name="extractClaudeResult rejects error results and missing result events" time="0.000241" classname="test"/>
+	<testcase name="extractAgentResult passes Codex output through unchanged" time="0.000292" classname="test"/>
+	<testcase name="claudeFailureCode recognizes rejected credentials and unknown models" time="0.001049" classname="test"/>
+	<testcase name="codexFailureCode reads only the final ERROR lines" time="0.000247" classname="test"/>
+	<testcase name="agentFailureCode reads Claude stdout and Codex stderr" time="0.000102" classname="test"/>
+	<testcase name="codexConfigModel reads the top-level model only" time="0.000112" classname="test"/>
+	<testcase name="Claude rejected usage limits retain reset details and defer to credential and model errors" time="0.001291" classname="test"/>
+	<testcase name="effort adds the provider's flag, and omitting it leaves commands unchanged" time="0.000240" classname="test"/>
+	<testcase name="default model for agy is gemini-4-neon-high and config schema accepts agy" time="0.008613" classname="test"/>
+	<testcase name="agyOptionArgs reads stream-json prompts from stdin and configures workspace-write vs read-only" time="0.000168" classname="test"/>
+	<testcase name="agentShellCommand builds agy commands with prompt on stdin" time="0.000289" classname="test"/>
+	<testcase name="extractAgyResult and agyFailureCode parse Antigravity stream-json events" time="0.001761" classname="test"/>
+	<testcase name="credentialsForCommand scopes agy auth volume strictly to agy agent roles" time="0.000599" classname="test"/>
+	<testcase name="dockerRunArgs mounts agy auth volume and unlocks gnome-keyring in dbus session" time="0.000346" classname="test"/>
+	<testcase name="loginAgyAuth labels volume without agent-cage.managed and cleans up aborted new volume" time="0.013120" classname="test"/>
+	<testcase name="CLI auth agy dispatches login, --status, and --logout" time="0.002828" classname="test"/>
+	<testcase name="doctor checks agy auth volume, probes agy with volume mount, and blocks Actions with agy" time="0.020839" classname="test"/>
+	<testcase name="setup supports agy, disables GitHub Actions when agy is selected, and rejects workflow generation" time="0.048436" classname="test"/>
+	<testcase name="checkIssue reports a missing config without fetching the issue" time="0.022539" classname="test"/>
+	<testcase name="checkIssue is not ready while a blocker is open and lists template warnings" time="0.007768" classname="test"/>
+	<testcase name="checkIssue is ready when every blocker is closed" time="0.004333" classname="test"/>
+	<testcase name="selection deletes merged, closed and old unlinked evidence only" time="0.001037" classname="test"/>
+	<testcase name="an open link protects a branch even when another linked PR is closed" time="0.000136" classname="test"/>
+	<testcase name="branch links do not match longer branch names" time="0.000077" classname="test"/>
+	<testcase name="cleanup command with fake runners: yes" time="0.008080" classname="test"/>
+	<testcase name="cleanup command with fake runners: nonTTY" time="0.001375" classname="test"/>
+	<testcase name="cleanup command with fake runners: decline" time="0.002904" classname="test"/>
+	<testcase name="cleanup command with fake runners: confirm" time="0.001089" classname="test"/>
+	<testcase name="plain cleanup does not invoke GitHub evidence cleanup" time="0.000330" classname="test"/>
+	<testcase name="explicit repository bypasses origin lookup" time="0.000437" classname="test"/>
+	<testcase name="root help lists commands" time="0.197575" classname="test"/>
+	<testcase name="command help is available for commands" time="1.037447" classname="test"/>
+	<testcase name="run accepts a positional issue URL" time="0.002851" classname="test"/>
+	<testcase name="revise passes the PR URL and feedback and writes the result file" time="0.008198" classname="test"/>
+	<testcase name="run writes the result file and exits zero on success" time="0.003592" classname="test"/>
+	<testcase name="run writes the result file and exits non-zero on failure" time="0.002063" classname="test"/>
+	<testcase name="run reads the result file path from the environment" time="0.001888" classname="test"/>
+	<testcase name="run writes a result file for preflight failures" time="0.001921" classname="test"/>
+	<testcase name="runs list and show read local run metadata" time="0.259901" classname="test"/>
+	<testcase name="runs show can emit color when forced" time="0.129465" classname="test"/>
+	<testcase name="runs list --json prints each run newest first with whether it was interrupted" time="0.264243" classname="test"/>
+	<testcase name="runs list --json in a repository without runs prints an empty list" time="0.126820" classname="test"/>
+	<testcase name="runs list in a repository without runs creates no state and prints no warnings" time="0.120532" classname="test"/>
+	<testcase name="run and revise pass --effort, and an unknown level is a usage error" time="0.001499" classname="test"/>
+	<testcase name="composeProjectName creates stable per-run project names" time="0.000507" classname="test"/>
+	<testcase name="composeBaseArgs scopes compose to project name and project directory" time="0.000402" classname="test"/>
+	<testcase name="hasComposeServices reports whether compose is configured" time="0.000067" classname="test"/>
+	<testcase name="compose project starts and tears down services with volumes" time="0.000207" classname="test"/>
+	<testcase name="compose readiness commands run on compose network without Docker socket or host ports" time="0.000137" classname="test"/>
+	<testcase name="readyCommandRunArgs is explicit about the no-workspace readiness container" time="0.000075" classname="test"/>
+	<testcase name="load reports a missing optional config" time="0.011886" classname="test"/>
+	<testcase name="load returns the YAML document and parsed valid config" time="0.017334" classname="test"/>
+	<testcase name="load distinguishes YAML and config validation failures" time="0.030822" classname="test"/>
+	<testcase name="update changes only supplied managed keys and preserves comments and unknown keys" time="0.013049" classname="test"/>
+	<testcase name="update validates before creating a missing config" time="0.009016" classname="test"/>
+	<testcase name="config schema accepts a minimal valid config" time="0.002764" classname="test"/>
+	<testcase name="config schema rejects empty verify commands" time="0.000508" classname="test"/>
+	<testcase name="config schema leaves test-first runs (red-green) off unless configured" time="0.000614" classname="test"/>
+	<testcase name="config schema requires red_green.run to name the test file" time="0.000261" classname="test"/>
+	<testcase name="config schema accepts explicit runtime image and Dockerfile" time="0.000261" classname="test"/>
+	<testcase name="config schema preserves unknown keys for forward compatibility" time="0.000206" classname="test"/>
+	<testcase name="execution mode defaults to docker" time="0.000073" classname="test"/>
+	<testcase name="execution mode reads from config when no env override" time="0.000055" classname="test"/>
+	<testcase name="execution mode env overrides config" time="0.000272" classname="test"/>
+	<testcase name="execution mode ignores empty env value and falls back" time="0.000282" classname="test"/>
+	<testcase name="execution mode rejects an invalid env value" time="0.000270" classname="test"/>
+	<testcase name="config schema accepts an explicit execution mode" time="0.000299" classname="test"/>
+	<testcase name="config schema accepts GitHub Actions settings" time="0.000828" classname="test"/>
+	<testcase name="config schema requires a pinned version when Actions is enabled" time="0.000199" classname="test"/>
+	<testcase name="agents default to Codex for both roles" time="0.000079" classname="test"/>
+	<testcase name="legacy agent.model applies to every Codex role" time="0.000149" classname="test"/>
+	<testcase name="agent roles pick a provider default model unless one is configured" time="0.000271" classname="test"/>
+	<testcase name="resolved agent config round-trips through the schema" time="0.000102" classname="test"/>
+	<testcase name="config schema rejects unknown agent providers" time="0.000172" classname="test"/>
+	<testcase name="agent effort parses for implement and review and resolves to undefined when omitted" time="0.000158" classname="test"/>
+	<testcase name="agent effort rejects unknown levels and names the allowed values" time="0.000103" classname="test"/>
+	<testcase name="changed-line coverage counts executable additions and merges uncovered ranges" time="0.001006" classname="test"/>
+	<testcase name="changed-line coverage has a distinct no executable lines item" time="0.000720" classname="test"/>
+	<testcase name="repeated LCOV records count each line once and merge hits" time="0.000080" classname="test"/>
+	<testcase name="normalizeCredentialEnv drops empty placeholders and mirrors GITHUB_TOKEN to GH_TOKEN" time="0.000889" classname="test"/>
+	<testcase name="setup and verify receive non-credential env only" time="0.000181" classname="test"/>
+	<testcase name="clone receives only GitHub auth" time="0.000089" classname="test"/>
+	<testcase name="implementation and review receive only Codex auth" time="0.000145" classname="test"/>
+	<testcase name="implementation and review use OAuth fallback only when OPENAI_API_KEY is absent" time="0.000165" classname="test"/>
+	<testcase name="publish receives only GitHub auth" time="0.000156" classname="test"/>
+	<testcase name="prepareRunCredentials centralizes run-level credential policy" time="0.000468" classname="test"/>
+	<testcase name="prepareRunCredentials skips OAuth lookup when OpenAI API key is present" time="0.000102" classname="test"/>
+	<testcase name="each agent role receives only its own provider's credentials" time="0.000366" classname="test"/>
+	<testcase name="prepareRunCredentials skips the Codex OAuth lookup when no role uses Codex" time="0.000768" classname="test"/>
+	<testcase name="mergeCredentialEnv layers repo values over the global agent credentials" time="0.000213" classname="test"/>
+	<testcase name="globalCredentialsPath follows XDG_CONFIG_HOME" time="0.000152" classname="test"/>
+	<testcase name="prepareRunCredentials takes GITHUB_TOKEN from the pinned gh account" time="0.000262" classname="test"/>
+	<testcase name="prepareRunCredentials uses the active gh account when none is pinned" time="0.000102" classname="test"/>
+	<testcase name="prepareRunCredentials fails when the pinned gh account has no token" time="0.000273" classname="test"/>
+	<testcase name="prepareRunCredentials rejects a gh account that is not a GitHub login" time="0.000131" classname="test"/>
+	<testcase name="dockerResourceNames creates stable Docker-safe resource names" time="0.001322" classname="test"/>
+	<testcase name="unauthenticatedRemoteUrl strips HTTPS credentials" time="0.000121" classname="test"/>
+	<testcase name="volume and network resources carry managed labels" time="0.000216" classname="test"/>
+	<testcase name="dockerRunArgs uses volume workspace and avoids host-sensitive mounts" time="0.000526" classname="test"/>
+	<testcase name="dockerRunArgs wires GitHub auth through command-scoped askpass" time="0.000860" classname="test"/>
+	<testcase name="dockerRunArgs can mount only the Codex auth file for OAuth fallback" time="0.000549" classname="test"/>
+	<testcase name="dockerRunArgs keeps stdin open only for commands that read input" time="0.000316" classname="test"/>
+	<testcase name="dockerRunArgs omits credential env and OAuth mount for setup and verify commands" time="0.000617" classname="test"/>
+	<testcase name="createDockerSandbox uses command-scoped env and Codex auth mounts" time="0.002281" classname="test"/>
+	<testcase name="dockerBuildArgs labels per-run runtime images" time="0.002187" classname="test"/>
+	<testcase name="buildRuntimeImage builds a labeled per-run image" time="0.000220" classname="test"/>
+	<testcase name="createDockerSandbox creates resources, clones into volume, runs commands, and cleans up" time="0.000255" classname="test"/>
+	<testcase name="createDockerSandbox can attach agent commands to an externally managed service network" time="0.000194" classname="test"/>
+	<testcase name="cleanupManagedDockerResources removes stopped resources and skips active runs by default" time="0.000452" classname="test"/>
+	<testcase name="cleanupManagedDockerResources --all removes active managed resources explicitly" time="0.000345" classname="test"/>
+	<testcase name="cleanupManagedDockerResources reports no-op cleanup without touching artifacts" time="0.000100" classname="test"/>
+	<testcase name="doctor reports missing configuration" time="0.008013" classname="test"/>
+	<testcase name="doctor validates configured Actions resources" time="0.009138" classname="test"/>
+	<testcase name="doctor checks local requirements without requiring Actions" time="0.008644" classname="test"/>
+	<testcase name="doctor checks Claude credentials when Claude implements" time="0.005127" classname="test"/>
+	<testcase name="doctor warns about GitHub credentials and loose permissions in the global file" time="0.002508" classname="test"/>
+	<testcase name="doctor reports which gh account local runs use" time="0.006306" classname="test"/>
+	<testcase name="doctor --probe runs each agent once in the runtime image with its own credentials" time="0.009130" classname="test"/>
+	<testcase name="doctor --probe probes a shared agent assignment once" time="0.011005" classname="test"/>
+	<testcase name="doctor --probe explains rejected credentials and unavailable models" time="0.002783" classname="test"/>
+	<testcase name="doctor --probe reports other failures with the last output line, redacted" time="0.007626" classname="test"/>
+	<testcase name="doctor --probe skips agents when Docker is unavailable or in direct mode" time="0.008159" classname="test"/>
+	<testcase name="doctor --probe explains Claude usage limits without raw stream JSON" time="0.012517" classname="test"/>
+	<testcase name="evidence README lists kinds, sizes and skipped reasons and embeds images" time="0.001162" classname="test"/>
+	<testcase name="evidence README omits the skipped files heading when nothing was skipped" time="0.000093" classname="test"/>
+	<testcase name="evidence uses immutable blob URLs, limits embeds, and omits absent evidence" time="0.000259" classname="test"/>
+	<testcase name="evidence pushes an isolated root commit through the host shell (reports=false)" time="0.189021" classname="test"/>
+	<testcase name="evidence pushes an isolated root commit through the host shell (reports=true)" time="0.214585" classname="test"/>
+	<testcase name="an evidence push failure is returned with its diagnostic" time="0.001516" classname="test"/>
+	<testcase name="generates a parseable issue-label and dispatch workflow for the target checkout" time="0.012778" classname="test"/>
+	<testcase name="scopes credentials to credential and issue-management steps" time="0.005867" classname="test"/>
+	<testcase name="normalizes all state labels and reports results and artifacts" time="0.008616" classname="test"/>
+	<testcase name="renders an optional job container and generic services" time="0.003191" classname="test"/>
+	<testcase name="rejects versions that are not exact" time="0.000242" classname="test"/>
+	<testcase name="installs and authenticates only the configured agent CLIs" time="0.003723" classname="test"/>
+	<testcase name="a Claude-only workflow does not require OpenAI credentials" time="0.004278" classname="test"/>
+	<testcase name="repository workflow keeps the blocked label without a failure comment" time="0.015788" classname="test"/>
+	<testcase name="parseGhAccounts lists signed-in github.com accounts and the active one" time="0.001935" classname="test"/>
+	<testcase name="parseGhAccounts treats unparsable output as no accounts" time="0.000315" classname="test"/>
+	<testcase name="listGhAccounts asks gh for github.com status as JSON" time="0.000270" classname="test"/>
+	<testcase name="ghAuthToken selects the account only when one is pinned" time="0.000095" classname="test"/>
+	<testcase name="ghAuthToken returns null when gh fails or prints nothing" time="0.000121" classname="test"/>
+	<testcase name="githubAccountSetting distinguishes unset, valid, and invalid values" time="0.000107" classname="test"/>
+	<testcase name="parseEnvFile parses simple dotenv assignments without leaking examples" time="0.001456" classname="test"/>
+	<testcase name="parseEnvFile rejects malformed assignments with line numbers" time="0.000295" classname="test"/>
+	<testcase name="readAgentCageEnv returns empty env when the local secret file is absent" time="0.008103" classname="test"/>
+	<testcase name="readAgentCageEnv reads local secrets from .agent-cage.env" time="0.005724" classname="test"/>
+	<testcase name="createSecretRedactor replaces known secret values and ignores empty values" time="0.000225" classname="test"/>
+	<testcase name="scanDiffForGuardViolations detects injected secrets and high confidence tokens" time="0.000446" classname="test"/>
+	<testcase name="scanDiffForGuardViolations detects private key material" time="0.000142" classname="test"/>
+	<testcase name="scanDiffForGuardViolations denies real env and auth files" time="0.000167" classname="test"/>
+	<testcase name="assertNoGuardViolations blocks later phases with clear violation details" time="0.000388" classname="test"/>
+	<testcase name="scanDiffForGuardViolations allows sample env files unless content looks secret-bearing" time="0.000336" classname="test"/>
+	<testcase name="isSensitiveFilePath classifies auth files and sample env files" time="0.000119" classname="test"/>
+	<testcase name="guardAttemptDecision retries within the configured bound and fails after it" time="0.000111" classname="test"/>
+	<testcase name="parseMarkdownSections nests subsections and ignores headings in code fences" time="0.000679" classname="test"/>
+	<testcase name="parseBlockerReferences resolves URLs, owner/repo#N, and #N against the issue repo" time="0.000581" classname="test"/>
+	<testcase name="checkIssueReadiness fails on open blockers and passes once they are closed" time="0.001010" classname="test"/>
+	<testcase name="checkIssueReadiness fails closed when a blocker cannot be looked up" time="0.000131" classname="test"/>
+	<testcase name="checkIssueReadiness only warns about missing or empty template sections" time="0.000117" classname="test"/>
+	<testcase name="checkIssueReadiness warns when a Linear issue lists #N blockers without a repository" time="0.000094" classname="test"/>
+	<testcase name="parseIssueUrl parses GitHub issue URLs and infers repo" time="0.000849" classname="test"/>
+	<testcase name="parseIssueUrl parses Linear issue URLs and keys" time="0.000093" classname="test"/>
+	<testcase name="parseIssueUrl rejects unsupported issue URLs" time="0.000183" classname="test"/>
+	<testcase name="fetchGithubIssueContext fetches issue context and selected human comments" time="0.000414" classname="test"/>
+	<testcase name="fetchLinearIssueContext requires LINEAR_API_KEY" time="0.000182" classname="test"/>
+	<testcase name="fetchLinearIssueContext fetches issue context and filters comments" time="0.000208" classname="test"/>
+	<testcase name="fetchIssueContext dispatches based on URL provider" time="0.000150" classname="test"/>
+	<testcase name="fetchIssueContext reports HTTP failures" time="0.000120" classname="test"/>
+	<testcase name="parseJunit counts testcases under a testsuites root" time="0.004055" classname="test"/>
+	<testcase name="parseJunit reads a single testsuite root and counts one testcase" time="0.000252" classname="test"/>
+	<testcase name="parseJunit follows nested suites and counts error as failed" time="0.000299" classname="test"/>
+	<testcase name="parseJunit rejects text that is not JUnit" time="0.000120" classname="test"/>
+	<testcase name="formatJunitItems sums files, names each and reports unreadable ones" time="0.012827" classname="test"/>
+	<testcase name="formatJunitFailures lists at most 20 failures" time="0.000688" classname="test"/>
+	<testcase name="isSqliteExperimentalWarning matches only the node:sqlite warning" time="0.000552" classname="test"/>
+	<testcase name="suppressSqliteExperimentalWarning hides the sqlite warning but keeps others" time="0.036658" classname="test"/>
+	<testcase name="the planner skill uses only agent-cage commands and options that exist" time="0.042945" classname="test"/>
+	<testcase name="the planner skill pins runs and revises to Docker with the variable they read" time="0.002147" classname="test"/>
+	<testcase name="the planner skill links only to files it ships" time="0.004412" classname="test"/>
+	<testcase name="detectProject: npm with a lockfile" time="0.001730" classname="test"/>
+	<testcase name="detectProject: npm without a lockfile" time="0.000309" classname="test"/>
+	<testcase name="detectProject: pnpm" time="0.000189" classname="test"/>
+	<testcase name="detectProject: yarn 1" time="0.000143" classname="test"/>
+	<testcase name="detectProject: yarn berry from packageManager" time="0.000283" classname="test"/>
+	<testcase name="detectProject: uv" time="0.000226" classname="test"/>
+	<testcase name="detectProject: poetry" time="0.000103" classname="test"/>
+	<testcase name="detectProject: requirements.txt installs into a venv outside the workspace" time="0.000091" classname="test"/>
+	<testcase name="detectProject: go" time="0.000353" classname="test"/>
+	<testcase name="detectProject: rust" time="0.000340" classname="test"/>
+	<testcase name="detectProject: maven" time="0.000189" classname="test"/>
+	<testcase name="detectProject: maven wrapper" time="0.000081" classname="test"/>
+	<testcase name="detectProject: gradle wrapper" time="0.000108" classname="test"/>
+	<testcase name="detectProject: gradle without a wrapper is left to the user" time="0.000097" classname="test"/>
+	<testcase name="detectProject: Makefile test target when nothing else verifies" time="0.000095" classname="test"/>
+	<testcase name="detectProject: Makefile is ignored when an ecosystem already verifies" time="0.000664" classname="test"/>
+	<testcase name="detectProject: Node tooling next to a Go module" time="0.000140" classname="test"/>
+	<testcase name="detectProject: vitest from devDependencies runs one file with npx" time="0.000111" classname="test"/>
+	<testcase name="detectProject: a test script that builds first has no red-green default" time="0.000088" classname="test"/>
+	<testcase name="detectProject: nothing recognizable" time="0.000082" classname="test"/>
+	<testcase name="detectProject offers JUnit for runners the test script runs directly" time="0.002739" classname="test"/>
+	<testcase name="detectProject offers JUnit for pytest" time="0.000499" classname="test"/>
+	<testcase name="generateRuntimeDockerfile installs toolchains as root in a fixed order" time="0.001244" classname="test"/>
+	<testcase name="generateRuntimeDockerfile keeps toolchain PATHs for the sandbox's login shell" time="0.000075" classname="test"/>
+	<testcase name="detectProject offers browser evidence from dependencies and devDependencies" time="0.003645" classname="test"/>
+	<testcase name="Playwright screenshot note for ts with screenshot on" time="0.000162" classname="test"/>
+	<testcase name="Playwright screenshot note for ts with screenshot only-on-failure" time="0.000122" classname="test"/>
+	<testcase name="Playwright screenshot note for ts with screenshot off" time="0.000120" classname="test"/>
+	<testcase name="Playwright screenshot note for js with screenshot on" time="0.000075" classname="test"/>
+	<testcase name="Playwright screenshot note for js with screenshot only-on-failure" time="0.000074" classname="test"/>
+	<testcase name="Playwright screenshot note for js with screenshot off" time="0.000076" classname="test"/>
+	<testcase name="Playwright screenshot note for mjs with screenshot on" time="0.000090" classname="test"/>
+	<testcase name="Playwright screenshot note for mjs with screenshot only-on-failure" time="0.002295" classname="test"/>
+	<testcase name="Playwright screenshot note for mjs with screenshot off" time="0.001755" classname="test"/>
+	<testcase name="Playwright screenshot note for cjs with screenshot on" time="0.000732" classname="test"/>
+	<testcase name="Playwright screenshot note for cjs with screenshot only-on-failure" time="0.002331" classname="test"/>
+	<testcase name="Playwright screenshot note for cjs with screenshot off" time="0.000146" classname="test"/>
+	<testcase name="buildPromptContext records present review policy without reading ignored instruction files" time="0.022256" classname="test"/>
+	<testcase name="buildPromptContext records missing review policy without failing" time="0.006174" classname="test"/>
+	<testcase name="generateBranchName creates run-specific branch names" time="0.000684" classname="test"/>
+	<testcase name="formatPrBody opens with the review's description, then verification, review, risks, run id, and GitHub closing keyword" time="0.000217" classname="test"/>
+	<testcase name="formatPrBody puts the Usage bullet in Run" time="0.000135" classname="test"/>
+	<testcase name="formatPrBody falls back to a one-line summary without a review description" time="0.000063" classname="test"/>
+	<testcase name="formatIssueLinkage links Linear issues without closing or mutating them" time="0.000056" classname="test"/>
+	<testcase name="hasPublishableChanges rejects empty status and accepts changed status" time="0.000124" classname="test"/>
+	<testcase name="branchExists checks local and remote branches without creating or force pushing" time="0.000524" classname="test"/>
+	<testcase name="publishSuccessfulRun creates one branch, one commit, one push, and one ready PR" time="0.000471" classname="test"/>
+	<testcase name="publishSuccessfulRun supports explicit draft PRs only when requested" time="0.000424" classname="test"/>
+	<testcase name="publishSuccessfulRun rejects empty diffs before branch creation" time="0.000600" classname="test"/>
+	<testcase name="publishSuccessfulRun fails branch collisions without force pushing" time="0.000198" classname="test"/>
+	<testcase name="publishRevision pushes one commit to the PR branch, rewrites the body, and comments with a marker" time="0.000394" classname="test"/>
+	<testcase name="publishRevision keeps the PR body when the review wrote no description" time="0.000106" classname="test"/>
+	<testcase name="publishRevision rejects a revision without changes before committing" time="0.000089" classname="test"/>
+	<testcase name="parsePullRequestUrl accepts pull request URLs, including tab paths" time="0.001071" classname="test"/>
+	<testcase name="the run ID and issue link round-trip through an Agent Cage PR body" time="0.000236" classname="test"/>
+	<testcase name="revise markers round-trip" time="0.000142" classname="test"/>
+	<testcase name="selectFeedback takes unresolved threads and only comments and reviews after the last revise, from people with write access" time="0.000512" classname="test"/>
+	<testcase name="fetchRevision reads the pull request, its comments, reviews, and review threads" time="0.028179" classname="test"/>
+	<testcase name="fetchRevision rejects a pull request that is closed" time="0.000604" classname="test"/>
+	<testcase name="fetchRevision rejects a pull request that is from a fork" time="0.000308" classname="test"/>
+	<testcase name="fetchRevision rejects a pull request that is not opened by Agent Cage" time="0.000304" classname="test"/>
+	<testcase name="fetchRevision fails with no_feedback when there is nothing to address" time="0.003067" classname="test"/>
+	<testcase name="QA harness covers success, verify failure, review blocking, secret guard failure, and no-op diff" time="0.004270" classname="test"/>
+	<testcase name="the red check passes a test written before the code, which fails on the code as it stands" time="0.228305" classname="test"/>
+	<testcase name="the red check reads a multi-line error as its reason" time="0.106201" classname="test"/>
+	<testcase name="the red check flags a test that already passes before the code" time="0.083871" classname="test"/>
+	<testcase name="the red check reverts code the red step wrote, and keeps support files" time="0.090516" classname="test"/>
+	<testcase name="a later red step is checked against the code earlier iterations wrote" time="0.085028" classname="test"/>
+	<testcase name="the test lock finds changed, added and deleted tests, and restores them" time="0.054262" classname="test"/>
+	<testcase name="the green check runs the tests written first and skips a deleted one" time="0.139080" classname="test"/>
+	<testcase name="the PR lines and the review summary describe each test written first" time="0.000515" classname="test"/>
+	<testcase name="a later red step replaces a file's earlier result" time="0.000156" classname="test"/>
+	<testcase name="parseGithubRepo normalizes owner/name strings" time="0.000903" classname="test"/>
+	<testcase name="parseGithubRepo normalizes GitHub HTTPS remotes" time="0.000134" classname="test"/>
+	<testcase name="parseGithubRepo normalizes GitHub SSH remotes" time="0.000104" classname="test"/>
+	<testcase name="resolveTargetRepo prefers explicit repo" time="0.000169" classname="test"/>
+	<testcase name="resolveTargetRepo uses GitHub issue inferred repo" time="0.000080" classname="test"/>
+	<testcase name="resolveTargetRepo fails on GitHub issue and cwd origin mismatch" time="0.000233" classname="test"/>
+	<testcase name="resolveTargetRepo uses cwd origin for Linear issue" time="0.000114" classname="test"/>
+	<testcase name="resolveTargetRepo fails when no repo source exists" time="0.000077" classname="test"/>
+	<testcase name="createAuthenticatedRepo validates token but returns tokenless HTTPS clone URL" time="0.000274" classname="test"/>
+	<testcase name="createAuthenticatedRepo requires GITHUB_TOKEN" time="0.000323" classname="test"/>
+	<testcase name="redactGithubToken removes token values from logs" time="0.000157" classname="test"/>
+	<testcase name="reports config defaults to no report files and rejects paths outside the repository" time="0.005167" classname="test"/>
+	<testcase name="report listings keep each file under the kind printed before it" time="0.000259" classname="test"/>
+	<testcase name="a report dump must name known files and deliver every byte it announced" time="0.000404" classname="test"/>
+	<testcase name="prepared report paths stay out of git status, and tracked matches are a config error" time="0.140423" classname="test"/>
+	<testcase name="clearing reports deletes only untracked files that match the report paths" time="0.045516" classname="test"/>
+	<testcase name="collecting reports copies regular files byte for byte and skips links and oversized files" time="0.047041" classname="test"/>
+	<testcase name="collecting reports stops at the file and total limits" time="0.035515" classname="test"/>
+	<testcase name="collecting reports with no matching files writes an empty manifest" time="0.033543" classname="test"/>
+	<testcase name="buildReviewPrompt includes read-only instructions and required context" time="0.000620" classname="test"/>
+	<testcase name="a passed command shows the reviewer only the last lines of each output stream" time="0.000290" classname="test"/>
+	<testcase name="buildReviewPrompt explains the red-green results only when the run wrote tests first" time="0.000213" classname="test"/>
+	<testcase name="buildReviewPrompt asks a passing review for a PR description that follows the repo's rules" time="0.000078" classname="test"/>
+	<testcase name="parseReviewReport accepts strict structured JSON from the review agent" time="0.018151" classname="test"/>
+	<testcase name="parseReviewReport ignores non-json fenced blocks before JSON" time="0.000655" classname="test"/>
+	<testcase name="parseReviewReport normalizes nullable structured output fields" time="0.005004" classname="test"/>
+	<testcase name="parseReviewReport keeps a PR description only from a passing review" time="0.000814" classname="test"/>
+	<testcase name="review report JSON schema requires every finding property" time="0.000802" classname="test"/>
+	<testcase name="parseReviewReport rejects passing reports with blocking findings" time="0.002228" classname="test"/>
+	<testcase name="reviewNextAction allows passing review to continue" time="0.000517" classname="test"/>
+	<testcase name="reviewNextAction feeds blocking findings back until max review cycles" time="0.000692" classname="test"/>
+	<testcase name="blockingReviewFeedback formats blocking findings for the implementer" time="0.000184" classname="test"/>
+	<testcase name="runIndependentReview runs a fresh review runner and returns parsed action" time="0.001006" classname="test"/>
+	<testcase name="runIndependentReview fails if the read-only review changes the diff" time="0.000330" classname="test"/>
+	<testcase name="host review runners pass effort to each CLI" time="0.099131" classname="test"/>
+	<testcase name="RunEvent schema is versioned, strict, and validates canonical activity context" time="0.005157" classname="test"/>
+	<testcase name="RunEventJournal sequences, redacts, bounds, and appends before delivery" time="0.054055" classname="test"/>
+	<testcase name="RunEventJournal keeps durable sequencing when observer delivery fails" time="0.013478" classname="test"/>
+	<testcase name="replay validates NDJSON, ignores exact duplicate delivery, and restores outcomes" time="0.029955" classname="test"/>
+	<testcase name="legacy phases map deterministically to canonical Stages" time="0.000123" classname="test"/>
+	<testcase name="runAgentCage reaches every gate and opens a PR in docker mode" time="0.273669" classname="test"/>
+	<testcase name="runAgentCage reaches every gate and opens a PR in direct mode" time="0.113520" classname="test"/>
+	<testcase name="runAgentCage parses review agent stdout without command log noise" time="0.141004" classname="test"/>
+	<testcase name="runAgentCage executes the happy path and records a successful run" time="0.146694" classname="test"/>
+	<testcase name="runAgentCage runs direct mode on the host without Docker resources" time="0.131436" classname="test"/>
+	<testcase name="runAgentCage redacts credential-bearing publish failures in artifacts" time="0.458772" classname="test"/>
+	<testcase name="runAgentCage builds configured runtime Dockerfiles before cloning" time="0.092932" classname="test"/>
+	<testcase name="runAgentCage records runtime image build failures" time="0.378483" classname="test"/>
+	<testcase name="runAgentCage preserves accepted changes before the publisher commits the workspace" time="0.091198" classname="test"/>
+	<testcase name="runAgentCage records verify failure after max iterations" time="0.401127" classname="test"/>
+	<testcase name="runAgentCage records retries as distinct canonical Stage Attempts" time="0.115390" classname="test"/>
+	<testcase name="runAgentCage writes a replayable terminal history for review blocking" time="0.412504" classname="test"/>
+	<testcase name="runAgentCage writes a replayable terminal history for secret guard exhaustion" time="0.442749" classname="test"/>
+	<testcase name="runAgentCage writes a replayable terminal history for verification timeout" time="0.399008" classname="test"/>
+	<testcase name="runAgentCage writes a replayable terminal history for no diff publish" time="0.443226" classname="test"/>
+	<testcase name="runAgentCage writes tests first, locks them while the code is written, and writes new tests for a blocking review" time="0.807633" classname="test"/>
+	<testcase name="runAgentCage writes no tests first unless the repo configures red-green" time="0.095126" classname="test"/>
+	<testcase name="runAgentCage implements with Claude and reviews with Codex using scoped credentials" time="0.078700" classname="test"/>
+	<testcase name="runAgentCage reports a missing base branch as clone_failed" time="0.374885" classname="test"/>
+	<testcase name="runAgentCage reports a rejected Claude token as agent_auth_failed" time="0.389986" classname="test"/>
+	<testcase name="runAgentCage reports other implementation errors as implement_failed" time="0.392119" classname="test"/>
+	<testcase name="runAgentCage reports an unsupported review model as agent_model_unavailable" time="0.406000" classname="test"/>
+	<testcase name="reviseAgentCagePullRequest revises the PR branch from its feedback and publishes a revision" time="0.084645" classname="test"/>
+	<testcase name="runAgentCage shows JUnit results in the PR body Verification section" time="0.129984" classname="test"/>
+	<testcase name="runAgentCage feeds failed JUnit tests, redacted, into the retry prompt" time="0.180882" classname="test"/>
+	<testcase name="runAgentCage collects each verify's report files and keeps them out of the change" time="0.193753" classname="test"/>
+	<testcase name="failed docker run reports evidence: github" time="0.094751" classname="test"/>
+	<testcase name="failed docker run reports evidence: linear" time="0.122542" classname="test"/>
+	<testcase name="failed docker run reports evidence: comment-error" time="0.094460" classname="test"/>
+	<testcase name="failed docker run reports evidence: revision" time="0.107425" classname="test"/>
+	<testcase name="failed direct run reports evidence: github" time="0.167363" classname="test"/>
+	<testcase name="failed direct run reports evidence: linear" time="0.099327" classname="test"/>
+	<testcase name="failed direct run reports evidence: comment-error" time="0.090842" classname="test"/>
+	<testcase name="failed direct run reports evidence: revision" time="0.099803" classname="test"/>
+	<testcase name="runAgentCage reports Claude usage limits with the reset time in its summary" time="0.384775" classname="test"/>
+	<testcase name="runAgentCage publishes changed-line coverage in Verification" time="0.161710" classname="test"/>
+	<testcase name="runAgentCage records every implement call in the summary's Usage table" time="0.115353" classname="test"/>
+	<testcase name="runAgentCage's failed run summary also has the Usage table" time="0.359626" classname="test"/>
+	<testcase name="docker shell runner finds the docker CLI and daemon from the host environment" time="0.041466" classname="test"/>
+	<testcase name="docker shell runner reports a missing docker CLI as docker_unavailable" time="0.005689" classname="test"/>
+	<testcase name="docker shell runner reports an unreachable daemon as docker_unavailable" time="0.012485" classname="test"/>
+	<testcase name="docker shell runner returns failures of the sandbox command itself" time="0.013150" classname="test"/>
+	<testcase name="docker runner reports a missing CLI or daemon as docker_unavailable" time="0.010997" classname="test"/>
+	<testcase name="docker runner keeps the command's own error when Docker is available" time="0.008460" classname="test"/>
+	<testcase name="agentCommandFailure maps timeouts, provider errors, and other failures" time="0.001394" classname="test"/>
+	<testcase name="host shell runner runs commands in the workspace directory" time="0.006386" classname="test"/>
+	<testcase name="host shell runner surfaces non-zero exit codes without throwing" time="0.003491" classname="test"/>
+	<testcase name="host shell runner writes input to stdin and closes stdin without it" time="0.013668" classname="test"/>
+	<testcase name="host shell runner merges base env with per-command env" time="0.004288" classname="test"/>
+	<testcase name="host shell runner does not inherit ambient credentials" time="0.004536" classname="test"/>
+	<testcase name="host shell runner supports shell operators like the docker runner" time="0.005178" classname="test"/>
+	<testcase name="host shell runner closes stdin so stdin-reading commands do not hang" time="0.003695" classname="test"/>
+	<testcase name="host shell runner enforces idle and total timeouts" time="2.007925" classname="test"/>
+	<testcase name="host shell runner configures git askpass when a GitHub token is present" time="0.007688" classname="test"/>
+	<testcase name="host shell runner leaves git askpass unset without a GitHub token" time="0.003530" classname="test"/>
+	<testcase name="codex auth logs in with the API key when one is present" time="0.000263" classname="test"/>
+	<testcase name="codex auth copies the OAuth file when no API key is present" time="0.000101" classname="test"/>
+	<testcase name="codex auth is a no-op for commands without credentials" time="0.000045" classname="test"/>
+	<testcase name="codex exec uses the sandbox flag by default" time="0.000114" classname="test"/>
+	<testcase name="codex exec bypasses the sandbox in direct mode" time="0.000054" classname="test"/>
+	<testcase name="line stream sink redacts complete lines and flushes the remainder" time="0.000809" classname="test"/>
+	<testcase name="host shell runner streams live output while still buffering the result" time="0.004516" classname="test"/>
+	<testcase name="createHostWorkspace makes an empty directory and cleans it up" time="0.001183" classname="test"/>
+	<testcase name="setup detects commands and enables both local Docker and Actions" time="0.064909" classname="test"/>
+	<testcase name="setup offers test-first runs (red-green) for a detected test runner" time="0.047953" classname="test"/>
+	<testcase name="setup turns on test-first runs only when asked, and --yes leaves an existing config alone" time="0.030598" classname="test"/>
+	<testcase name="setup is rerunnable and preserves unknown config" time="0.015293" classname="test"/>
+	<testcase name="disabling Actions removes only a managed workflow" time="0.026224" classname="test"/>
+	<testcase name="setup refuses to replace an unmanaged workflow" time="0.010973" classname="test"/>
+	<testcase name="dry-run reports changes without writing files" time="0.007809" classname="test"/>
+	<testcase name="setup writes local secrets with restricted permissions" time="0.014230" classname="test"/>
+	<testcase name="setup never overwrites existing review policy or env example" time="0.013193" classname="test"/>
+	<testcase name="setup dry-run reports scaffold files without writing them" time="0.006012" classname="test"/>
+	<testcase name="setup merges missing keys into an existing env example" time="0.010460" classname="test"/>
+	<testcase name="interactive setup implements with Claude and reviews with Codex by default" time="0.015499" classname="test"/>
+	<testcase name="non-interactive setup falls back to Codex without Claude credentials" time="0.009612" classname="test"/>
+	<testcase name="non-interactive setup picks Claude when the global file has a Claude token" time="0.011987" classname="test"/>
+	<testcase name="setup keeps the agents of an existing config" time="0.011714" classname="test"/>
+	<testcase name="setup saves agent credentials to the global file and GitHub to the repo" time="0.015799" classname="test"/>
+	<testcase name="setup pins the chosen gh account instead of asking for GITHUB_TOKEN" time="0.014716" classname="test"/>
+	<testcase name="setup --yes pins the active gh account" time="0.010543" classname="test"/>
+	<testcase name="setup --yes keeps a pinned gh account that is no longer signed in" time="0.014492" classname="test"/>
+	<testcase name="setup --yes detects a Go project and generates a runtime Dockerfile" time="0.013384" classname="test"/>
+	<testcase name="setup references an existing runtime Dockerfile without overwriting it" time="0.013832" classname="test"/>
+	<testcase name="setup skips the runtime Dockerfile when the user declines it" time="0.023636" classname="test"/>
+	<testcase name="setup leaves a config that already sets runtime.dockerfile" time="0.014301" classname="test"/>
+	<testcase name="setup adds no runtime Dockerfile for an npm project" time="0.015030" classname="test"/>
+	<testcase name="setup takes the Codex model from config.toml for a ChatGPT login" time="0.020729" classname="test"/>
+	<testcase name="setup warns when a ChatGPT login has no model in config.toml" time="0.015077" classname="test"/>
+	<testcase name="setup keeps the API default Codex model when OPENAI_API_KEY is set" time="0.012553" classname="test"/>
+	<testcase name="setup offers the node:test JUnit reporter and writes verify and reports.junit" time="0.015290" classname="test"/>
+	<testcase name="setup offers the vitest JUnit reporter and writes verify and reports.junit" time="0.015189" classname="test"/>
+	<testcase name="declining the JUnit offer leaves verify and reports alone" time="0.016332" classname="test"/>
+	<testcase name="setup --yes adds JUnit only to a new config" time="0.036585" classname="test"/>
+	<testcase name="setup offers Jest JUnit only when jest-junit is a dependency" time="0.044786" classname="test"/>
+	<testcase name="setup accepts evidence while keeping accepted JUnit" time="0.013679" classname="test"/>
+	<testcase name="setup declines evidence while keeping accepted JUnit" time="0.015125" classname="test"/>
+	<testcase name="existing evidence skips the question and survives the JUnit offer" time="0.014908" classname="test"/>
+	<testcase name="setup --yes adds evidence only to a new config" time="0.024866" classname="test"/>
+	<testcase name="evidence can be accepted without a JUnit offer in new and existing configs" time="0.026148" classname="test"/>
+	<testcase name="setup coverage offer for node --test with {}" time="0.019246" classname="test"/>
+	<testcase name="setup coverage offer for jest with {}" time="0.013719" classname="test"/>
+	<testcase name="setup coverage offer for vitest run with {}" time="0.014232" classname="test"/>
+	<testcase name="setup coverage offer for vitest run with {&amp;quot;@vitest/coverage-v8&amp;quot;:&amp;quot;*&amp;quot;}" time="0.013400" classname="test"/>
+	<testcase name="pytest setup coverage requires pytest-cov (false)" time="0.015293" classname="test"/>
+	<testcase name="pytest setup coverage requires pytest-cov (true)" time="0.011179" classname="test"/>
+	<testcase name="run store persists runs, phases, review cycles, and artifacts" time="0.062389" classname="test"/>
+	<testcase name="run store fails clearly for unknown runs" time="0.015993" classname="test"/>
+	<testcase name="run stores opened by parallel runs keep each other's writes" time="0.030085" classname="test"/>
+	<testcase name="read-only run store sees in-progress writes and rejects its own writes" time="0.021003" classname="test"/>
+	<testcase name="read-only run store treats a repository without a database as having no runs" time="0.001536" classname="test"/>
+	<testcase name="run store records the process that runs each run" time="0.016461" classname="test"/>
+	<testcase name="a run is interrupted only when it never finished and its process is gone" time="0.000195" classname="test"/>
+	<testcase name="a process owned by another user counts as alive" time="0.000068" classname="test"/>
+	<testcase name="a database from an earlier version gains a pid column and keeps its runs" time="0.033842" classname="test"/>
+	<testcase name="parseAgentUsage reads the four Claude token counts and the cost" time="0.000766" classname="test"/>
+	<testcase name="parseAgentUsage gives zeros for an errored Claude result with no usage" time="0.000141" classname="test"/>
+	<testcase name="parseAgentUsage reads the Codex total" time="0.000112" classname="test"/>
+	<testcase name="parseAgentUsage gives null without usage" time="0.000100" classname="test"/>
+	<testcase name="stageDurations sums attempts and counts a failed stage" time="0.003453" classname="test"/>
+	<testcase name="formatTokenCount rounds to k or M" time="0.000068" classname="test"/>
+	<!-- tests 420 -->
+	<!-- suites 0 -->
+	<!-- pass 420 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 9808.340588 -->
+</testsuites>
