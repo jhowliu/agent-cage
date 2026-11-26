@@ -1,6 +1,6 @@
 {
   "name": "agent-cage",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Run Codex in an isolated Docker workspace and publish verified PRs from issue links.",
   "license": "Apache-2.0",
   "type": "module",
