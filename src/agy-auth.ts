@@ -16,6 +16,9 @@ import { RunFailureError } from "./run/errors.js";
 // the persistent Antigravity login volume alongside ephemeral per-run volumes.
 export const agyAuthVolumeLabel = "agent-cage.auth_provider=agy";
 
+/** Where agy saves its OAuth token inside the auth volume when it runs in a container. */
+export const agyOAuthTokenPath = `${agyAuthMountTarget}/cli/antigravity-oauth-token`;
+
 export type AgyInteractiveRunner = (
   args: readonly string[],
 ) => Promise<{ exitCode: number }>;
@@ -91,6 +94,11 @@ export async function checkAgyAuthStatus(
     return { volumeName, volumeExists: false, authenticated: false, image };
   }
 
+  // In a container agy logs "Using file-based token storage because container
+  // environment detected" and writes its OAuth token to
+  // ~/.gemini/antigravity-cli/antigravity-oauth-token, which
+  // commandWithAgyKeyring links into the volume's `cli` directory. The keyring
+  // stays empty, so the token file is what proves a login was saved.
   const lookup = await runner.run([
     "run",
     "--rm",
@@ -101,9 +109,7 @@ export async function checkAgyAuthStatus(
     image,
     "sh",
     "-lc",
-    commandWithAgyKeyring(
-      "secret-tool lookup service gemini account antigravity >/dev/null 2>&1",
-    ),
+    `test -s ${agyOAuthTokenPath}`,
   ]);
 
   return {
