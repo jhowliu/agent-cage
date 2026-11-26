@@ -22,9 +22,13 @@ export type AgentProvider = (typeof agentProviders)[number];
 export const agentRoles = ["implement", "review"] as const;
 export type AgentRole = (typeof agentRoles)[number];
 
+export const agentEfforts = ["low", "medium", "high", "xhigh", "max"] as const;
+export type AgentEffort = (typeof agentEfforts)[number];
+
 export type AgentAssignment = {
   provider: AgentProvider;
   model: string;
+  effort?: AgentEffort;
 };
 
 export type AgentAssignments = Record<AgentRole, AgentAssignment>;
@@ -84,16 +88,17 @@ export function agentShellCommand(
 function agentCommandLine(agent: AgentAssignment, input: AgentCommandInput): string {
   switch (agent.provider) {
     case "codex":
-      return codexShellCommand(agent.model, input);
+      return codexShellCommand(agent.model, agent.effort, input);
     case "claude":
       return claudeExecCommand(
         input.access === "read-only"
           ? {
               access: "read-only",
               model: agent.model,
+              effort: agent.effort,
               outputSchema: input.outputSchema,
             }
-          : { access: "workspace-write", model: agent.model },
+          : { access: "workspace-write", model: agent.model, effort: agent.effort },
       );
     case "agy":
       return agyExecCommand(
@@ -101,11 +106,13 @@ function agentCommandLine(agent: AgentAssignment, input: AgentCommandInput): str
           ? {
               access: "read-only",
               model: agent.model,
+              effort: agent.effort,
               outputSchema: input.outputSchema,
             }
           : {
               access: "workspace-write",
               model: agent.model,
+              effort: agent.effort,
               sandbox: input.executionMode === "direct",
             },
       );
@@ -178,13 +185,18 @@ export function agentProvidersInUse(
   return new Set(agentRoles.map((role) => agents[role]));
 }
 
-function codexShellCommand(model: string, input: AgentCommandInput): string {
+function codexShellCommand(
+  model: string,
+  effort: AgentEffort | undefined,
+  input: AgentCommandInput,
+): string {
   const bypassSandbox = input.executionMode === "direct";
 
   switch (input.access) {
     case "workspace-write":
       return codexExecCommand({
         model,
+        effort,
         sandbox: "workspace-write",
         bypassSandbox,
       });
@@ -194,6 +206,7 @@ function codexShellCommand(model: string, input: AgentCommandInput): string {
       )} > ${shellQuote(codexOutputSchemaPath)}`;
       return `${writeOutputSchema} && ${codexExecCommand({
         model,
+        effort,
         sandbox: "read-only",
         outputSchemaPath: codexOutputSchemaPath,
         bypassSandbox,

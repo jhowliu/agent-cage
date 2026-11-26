@@ -238,3 +238,36 @@ test("Claude rejected usage limits retain reset details and defer to credential 
   );
   assert.equal(claudeRateLimitInfo(rateLimitEvent.replace("1795505400", "1e100")), null);
 });
+
+test("effort adds the provider's flag, and omitting it leaves commands unchanged", () => {
+  const input = {
+    access: "workspace-write",
+    prompt: "p",
+    executionMode: "docker",
+  } as const;
+  const reviewInput = {
+    access: "read-only",
+    prompt: "p",
+    executionMode: "docker",
+    outputSchema: schema,
+  } as const;
+
+  for (const provider of ["claude", "agy"] as const) {
+    const agent = { provider, model: "m" } as const;
+    for (const i of [input, reviewInput]) {
+      const plain = agentShellCommand(agent, i).command;
+      const high = agentShellCommand({ ...agent, effort: "high" }, i).command;
+      assert.doesNotMatch(plain, /--effort/);
+      assert.match(high, /'--effort' 'high'/);
+    }
+  }
+
+  const codex = { provider: "codex", model: "m" } as const;
+  for (const i of [input, reviewInput]) {
+    assert.doesNotMatch(agentShellCommand(codex, i).command, / -c /);
+    assert.match(
+      agentShellCommand({ ...codex, effort: "high" }, i).command,
+      / -c 'model_reasoning_effort="high"' /,
+    );
+  }
+});

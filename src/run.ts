@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import YAML from "yaml";
 import { defaultAgyAuthVolumeName } from "./agent/agy.js";
 import { codexHomePath } from "./agent/codex.js";
-import type { AgentAssignments } from "./agent/providers.js";
+import type { AgentAssignments, AgentEffort } from "./agent/providers.js";
 import { isAgyAuthVolumePresent } from "./agy-auth.js";
 import type { createComposeProject } from "./compose.js";
 import {
@@ -52,6 +52,7 @@ export type RunCommandOptions = {
   repo?: string | undefined;
   base?: string | undefined;
   model?: string | undefined;
+  effort?: AgentEffort | undefined;
   draft?: boolean | undefined;
   verbose?: boolean | undefined;
 };
@@ -62,6 +63,7 @@ export type ReviseCommandOptions = {
   feedback?: string | undefined;
   runId?: string | undefined;
   model?: string | undefined;
+  effort?: AgentEffort | undefined;
   verbose?: boolean | undefined;
 };
 
@@ -262,6 +264,7 @@ async function prepareRunFoundation(
   cwd: string,
   options: {
     model?: string | undefined;
+    effort?: AgentEffort | undefined;
     runId?: string | undefined;
     verbose?: boolean | undefined;
   },
@@ -282,6 +285,9 @@ async function prepareRunFoundation(
     implement: {
       provider: agentConfig.implement.provider,
       model: options.model ?? agentConfig.implement.model,
+      ...((options.effort ?? agentConfig.implement.effort) === undefined
+        ? {}
+        : { effort: options.effort ?? agentConfig.implement.effort }),
     },
     review: agentConfig.review,
   };

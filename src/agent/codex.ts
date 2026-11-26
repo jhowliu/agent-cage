@@ -1,15 +1,20 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { shellQuote } from "../shell.js";
-import type { AgentFailureCode } from "./providers.js";
+import type { AgentEffort, AgentFailureCode } from "./providers.js";
 
 export function codexExecCommand(input: {
   model: string;
+  effort?: AgentEffort | undefined;
   sandbox: "read-only" | "workspace-write";
   outputSchemaPath?: string | undefined;
   bypassSandbox?: boolean | undefined;
 }): string {
   const args = ["codex exec", "--model", shellQuote(input.model)];
+
+  if (input.effort !== undefined) {
+    args.push("-c", shellQuote(codexEffortConfig(input.effort)));
+  }
 
   if (input.bypassSandbox === true) {
     // Direct mode runs on an already-isolated, ephemeral runner where Codex's
@@ -30,6 +35,11 @@ export function codexExecCommand(input: {
   args.push("-");
 
   return args.join(" ");
+}
+
+/** The `-c` override that sets Codex's reasoning effort for one session. */
+export function codexEffortConfig(effort: AgentEffort): string {
+  return `model_reasoning_effort="${effort}"`;
 }
 
 /**

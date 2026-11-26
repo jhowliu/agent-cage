@@ -63,8 +63,10 @@ verify:
 agent:
   implement:
     provider: claude # claude, codex, or agy
+    effort: high # optional: low, medium, high, xhigh, or max
   review:
     provider: codex # codex, claude, or agy
+    effort: xhigh
 ```
 
 New configs implement with Claude Code and review with Codex. Configs without `agent.implement`/`agent.review` keep using Codex for both. When `agy` (Antigravity CLI) is configured for local Docker runs, run `agent-cage auth agy` once to sign in inside the persistent `agent-cage-agy-auth` Docker volume without an API key.
@@ -175,6 +177,7 @@ Common options:
 - `--repo OWNER/REPO`: override target repo resolution, commonly needed for Linear issues.
 - `--base <branch>`: override the base branch from config.
 - `--model <model>`: override the Codex model for this run.
+- `--effort <level>`: override the implementation effort (`low`, `medium`, `high`, `xhigh`, `max`) for this run.
 - `--draft`: create a draft GitHub PR.
 
 The `run` command reads `.agent-cage.yml` and `.agent-cage.env`, fetches issue context, resolves the target repo, creates a Docker workspace, starts configured Compose services, runs Codex implementation iterations, verifies configured commands, scans the diff for secrets, runs independent review, and publishes a PR when all gates pass.
@@ -187,7 +190,7 @@ agent-cage revise https://github.com/OWNER/REPO/pull/45 --feedback "Keep the old
 
 `revise` takes an open PR that an Agent Cage run opened, in the same repository, and addresses its feedback: every unresolved review thread, the comments and reviews posted since the last revise, and `--feedback`. It runs the same implement, verify, and review loop on the PR's branch, with the review reading the whole PR against its base. It then pushes one new commit without force, replaces the PR description with the review's, and comments with the feedback it addressed. It leaves review threads unresolved; resolve the ones the commit settles, since the next revise reads every unresolved thread again.
 
-Options: `--feedback <text>`, `--model <model>`, `--run-id <id>`, `--result-json <path>`, and `--verbose`, as for `run`. A PR without a Run ID in its description, from a fork, or closed fails with `pr_not_revisable`; a PR with nothing to address fails with `no_feedback`.
+Options: `--feedback <text>`, `--model <model>`, `--effort <level>`, `--run-id <id>`, `--result-json <path>`, and `--verbose`, as for `run`. A PR without a Run ID in its description, from a fork, or closed fails with `pr_not_revisable`; a PR with nothing to address fails with `no_feedback`.
 
 ### Inspect Local Runs
 
