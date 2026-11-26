@@ -99,7 +99,15 @@ test("agent commands take the prompt on stdin, never as an argument", () => {
           : { access, prompt, executionMode: "docker" as const };
       const agentCommand = agentShellCommand({ provider, model: "m" }, input);
 
-      assert.equal(agentCommand.stdin, prompt);
+      if (provider === "agy") {
+        // agy reads its prompt as one stream-json `user` message.
+        assert.deepEqual(JSON.parse(agentCommand.stdin), {
+          event: "user",
+          message: { content: prompt },
+        });
+      } else {
+        assert.equal(agentCommand.stdin, prompt);
+      }
       assert.ok(agentCommand.command.length < 2048, `${provider} ${access}`);
       assert.doesNotMatch(agentCommand.command, /Review it/);
     }

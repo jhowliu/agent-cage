@@ -5,6 +5,7 @@ import {
   agyExecCommand,
   agyFailureCode,
   agyRateLimitMessage,
+  agyStdinMessage,
   extractAgyResult,
 } from "./agy.js";
 import {
@@ -74,7 +75,10 @@ export function agentShellCommand(
   agent: AgentAssignment,
   input: AgentCommandInput,
 ): AgentCommand {
-  return { command: agentCommandLine(agent, input), stdin: input.prompt };
+  return {
+    command: agentCommandLine(agent, input),
+    stdin: agent.provider === "agy" ? agyStdinMessage(input.prompt) : input.prompt,
+  };
 }
 
 function agentCommandLine(agent: AgentAssignment, input: AgentCommandInput): string {

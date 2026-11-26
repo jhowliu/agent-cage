@@ -81,14 +81,17 @@ test("default model for agy is gemini-4-neon-high and config schema accepts agy"
   });
 });
 
-test("agyOptionArgs places --print=... last and configures workspace-write vs read-only", () => {
+test("agyOptionArgs reads stream-json prompts from stdin and configures workspace-write vs read-only", () => {
   const writeArgs = agyOptionArgs({
     access: "workspace-write",
     model: "gemini-4-neon-high",
   });
   assert.equal(writeArgs.includes("--dangerously-skip-permissions"), true);
   assert.equal(writeArgs.includes("--sandbox"), false);
-  assert.match(writeArgs.at(-1) ?? "", /^--print=Follow the instructions/);
+  // agy ignores stdin when --print carries a prompt, so the prompt arrives as a
+  // stream-json message and --print stays empty.
+  assert.equal(writeArgs.at(-1), "--print=");
+  assert.equal(writeArgs[writeArgs.indexOf("--input-format") + 1], "stream-json");
 
   const directWriteArgs = agyOptionArgs({
     access: "workspace-write",
@@ -110,7 +113,8 @@ test("agyOptionArgs places --print=... last and configures workspace-write vs re
   };
   assert.equal(settings.permissions?.deny?.includes("write_file(*)"), true);
   assert.equal(settings.permissions?.allow?.includes("command(git diff)"), true);
-  assert.match(readOnlyArgs.at(-1) ?? "", /^--print=Follow the instructions/);
+  assert.equal(readOnlyArgs.at(-1), "--print=");
+  assert.equal(readOnlyArgs[readOnlyArgs.indexOf("--input-format") + 1], "stream-json");
 });
 
 test("agentShellCommand builds agy commands with prompt on stdin", () => {
@@ -122,7 +126,10 @@ test("agentShellCommand builds agy commands with prompt on stdin", () => {
       executionMode: "docker",
     },
   );
-  assert.equal(implementCmd.stdin, "Implement feature X");
+  assert.equal(
+    implementCmd.stdin,
+    '{"event":"user","message":{"content":"Implement feature X"}}\n',
+  );
   assert.match(implementCmd.command, /^agy '--model' 'gemini-4-neon-high'/);
   assert.doesNotMatch(implementCmd.command, /Implement feature X/);
 
@@ -135,7 +142,7 @@ test("agentShellCommand builds agy commands with prompt on stdin", () => {
       outputSchema: { type: "object" },
     },
   );
-  assert.equal(reviewCmd.stdin, "Review diff");
+  assert.equal(reviewCmd.stdin, '{"event":"user","message":{"content":"Review diff"}}\n');
   assert.match(reviewCmd.command, /printf %s '\{"type":"object"\}' > /);
   assert.match(reviewCmd.command, /&& agy '--model' 'gemini-4-neon-high'/);
   assert.equal(
